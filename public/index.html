@@ -1,993 +1,750 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LivestockMart - User Portal</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <style>
-    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Inter", sans-serif; }
-    .hide-scrollbar::-webkit-scrollbar { display: none; }
-    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    @keyframes stepPulse {
-      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
-      70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(34,197,94,0); }
-      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34,197,94,0); }
-    }
-    .step-active { animation: stepPulse 1.4s ease-out infinite; }
-  </style>
-</head>
-<body class="bg-gray-50 text-gray-900">
-  <div id="auth-screen" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-600 via-emerald-500 to-emerald-700 px-4">
-    <div class="max-w-5xl w-full grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
-      <div class="hidden md:flex flex-col justify-between text-white">
-        <div>
-          <div class="flex items-center gap-3 mb-6">
-            <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-bold text-lg">
-              L
-            </div>
-            <span class="text-2xl font-bold tracking-tight">LivestockMart</span>
-          </div>
-          <h1 class="text-3xl md:text-4xl font-bold leading-tight mb-4">
-            Buy goats & sheep<br>with an Amazon-style checkout.
-          </h1>
-          <p class="text-sm text-emerald-100/80">
-            Secure login, realtime orders, UPI & card payments, and live order tracking – all from one modern dashboard.
-          </p>
-        </div>
-        <div class="flex items-center gap-3 text-xs text-emerald-100/70 mt-8">
-          <i data-lucide="shield-check" class="w-4 h-4"></i>
-          <span>Secure authentication • Payments to <b>sai.kambala@ybl</b> via UPI</span>
-        </div>
-      </div>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LivestockMart - User App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.1/dist/umd/lucide.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-      <div id="auth-card" class="bg-white/95 rounded-3xl p-6 sm:p-8 shadow-2xl border border-white/40">
-        <div class="flex items-center gap-3 mb-6">
-          <div class="w-9 h-9 rounded-full bg-emerald-500/10 flex items-center justify-center">
-            <i data-lucide="lock" class="w-4 h-4 text-emerald-500"></i>
-          </div>
-          <div>
-            <h2 class="text-xl font-semibold text-gray-900">Welcome back</h2>
-            <p class="text-xs text-gray-500">Login or create an account to continue</p>
-          </div>
-        </div>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
 
-        <div class="flex text-xs mb-4 bg-gray-100 rounded-full p-1">
-          <button id="tab-login" class="flex-1 py-2 rounded-full bg-white shadow text-gray-900 font-medium">Login</button>
-          <button id="tab-register" class="flex-1 py-2 rounded-full text-gray-500">Register</button>
-        </div>
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-        <form id="login-form" class="space-y-4">
-          <div>
-            <label class="block text-xs font-medium mb-1">Email</label>
-            <input id="login-email" type="email" value="user@example.com" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium mb-1">Password</label>
-            <input id="login-password" type="password" value="password" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
-          <p id="auth-error" class="text-xs text-red-500 min-h-[16px]"></p>
-          <button type="submit" class="w-full bg-emerald-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-emerald-700 flex items-center justify-center gap-2">
-            <span>Login</span>
-          </button>
-          <p class="text-[10px] text-center text-gray-400">Demo Mode: Use user@example.com / password</p>
-        </form>
+        .auth-glass { background: rgba(17, 24, 39, 0.85); backdrop-filter: blur(18px); }
+        .auth-card { position: relative; overflow: hidden; }
+        .auth-panel { transition: transform 0.45s ease, opacity 0.45s ease; }
+        .auth-panel-register { position: absolute; inset: 0; transform: translateX(100%); opacity: 0; }
+        .auth-card.show-register .auth-panel-login { transform: translateX(-100%); opacity: 0; }
+        .auth-card.show-register .auth-panel-register { transform: translateX(0); opacity: 1; }
 
-        <form id="register-form" class="space-y-4 hidden">
-          <div>
-            <label class="block text-xs font-medium mb-1">Full Name</label>
-            <input id="register-name" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium mb-1">Email</label>
-            <input id="register-email" type="email" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium mb-1">Password</label>
-            <input id="register-password" type="password" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
-          <button type="submit" class="w-full bg-emerald-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-emerald-700 flex items-center justify-center gap-2">
-            <span>Create account</span>
-          </button>
-        </form>
-      </div>
-    </div>
-  </div>
-
-  <div id="user-app" class="hidden min-h-screen flex flex-col">
-    <header class="bg-white border-b border-gray-200 px-4 md:px-8 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <div class="w-9 h-9 rounded-full bg-emerald-600 flex items-center justify-center text-white font-bold">L</div>
-        <div>
-          <h1 id="page-title" class="text-lg md:text-2xl font-bold text-gray-900">My Dashboard</h1>
-          <p id="current-date" class="text-xs text-gray-500"></p>
-        </div>
-      </div>
-      <div class="flex items-center gap-5">
-        <button class="relative flex items-center justify-center" onclick="router('cart')">
-          <span class="text-2xl leading-none">🛒</span>
-          <span id="header-cart-badge" class="absolute -top-2 -right-3 bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full hidden">0</span>
-        </button>
-
-        <div class="relative">
-          <button onclick="toggleProfileMenu()" class="flex items-center gap-2">
-            <div id="profile-avatar" class="w-8 h-8 rounded-full bg-emerald-600 text-white text-xs flex items-center justify-center font-semibold">
-              U
-            </div>
-            <div class="hidden md:block text-left">
-              <p id="profile-name" class="text-sm font-semibold">User</p>
-              <p id="profile-meta" class="text-xs text-gray-500">Welcome</p>
-            </div>
-            <i data-lucide="chevron-down" class="w-4 h-4 text-gray-500 hidden md:block"></i>
-          </button>
-          <div id="profile-menu" class="absolute right-0 mt-2 w-44 bg-white border border-gray-100 rounded-lg shadow-lg py-1 hidden">
-            <button onclick="router('profile'); toggleProfileMenu(false);" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
-              <i data-lucide="user" class="w-4 h-4"></i><span>Profile</span>
-            </button>
-            <button onclick="handleLogout()" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
-              <i data-lucide="log-out" class="w-4 h-4"></i><span>Logout</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </header>
-
-    <div class="flex flex-1 min-h-0">
-      <nav class="hidden md:block w-60 bg-white border-r border-gray-100 p-4 space-y-2">
-        <button class="nav-item w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100 bg-green-600 text-white" onclick="router('dashboard')">
-          <i data-lucide="home" class="w-4 h-4"></i><span>Dashboard</span>
-        </button>
-        <button class="nav-item w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100" onclick="router('browse')">
-          <i data-lucide="cow" class="w-4 h-4"></i><span>Browse Livestock</span>
-        </button>
-        <button class="nav-item w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100" onclick="router('cart')">
-          <i data-lucide="shopping-cart" class="w-4 h-4"></i><span>Cart</span>
-        </button>
-        <button class="nav-item w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100" onclick="router('orders')">
-          <i data-lucide="receipt" class="w-4 h-4"></i><span>My Orders</span>
-        </button>
-      </nav>
-
-      <main id="content-area" class="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-50 hide-scrollbar">
-        <section id="view-dashboard" class="space-y-6">
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div class="bg-white p-4 rounded-xl border shadow-sm flex justify-between items-center">
-              <div>
-                <p class="text-xs text-gray-500">Total Livestock</p>
-                <p id="dash-total-livestock" class="text-xl font-bold">0</p>
-              </div>
-              <div class="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center">
-                <i data-lucide="cow" class="w-5 h-5 text-emerald-600"></i>
-              </div>
-            </div>
-            <div class="bg-white p-4 rounded-xl border shadow-sm flex justify-between items-center">
-              <div>
-                <p class="text-xs text-gray-500">Orders</p>
-                <p id="dash-total-orders" class="text-xl font-bold">0</p>
-              </div>
-              <div class="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center">
-                <i data-lucide="receipt" class="w-5 h-5 text-blue-600"></i>
-              </div>
-            </div>
-            <div class="bg-white p-4 rounded-xl border shadow-sm flex justify-between items-center">
-              <div>
-                <p class="text-xs text-gray-500">Wishlist</p>
-                <p id="dash-total-wishlist" class="text-xl font-bold">0</p>
-              </div>
-              <div class="w-9 h-9 rounded-full bg-pink-50 flex items-center justify-center">
-                <i data-lucide="heart" class="w-5 h-5 text-pink-500"></i>
-              </div>
-            </div>
-            <div class="bg-white p-4 rounded-xl border shadow-sm flex justify-between items-center">
-              <div>
-                <p class="text-xs text-gray-500">Total Spent</p>
-                <p id="dash-total-spent" class="text-xl font-bold">₹0</p>
-              </div>
-              <div class="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center">
-                <i data-lucide="indian-rupee" class="w-5 h-5 text-amber-500"></i>
-              </div>
-            </div>
-          </div>
-
-          <div class="bg-white p-4 rounded-xl border shadow-sm">
-            <div class="flex items-center justify-between mb-3">
-              <h3 class="font-semibold text-gray-800">Recent orders</h3>
-            </div>
-            <div id="dash-recent-orders" class="space-y-3 text-sm text-gray-600">
-              <p>No orders yet.</p>
-            </div>
-          </div>
-        </section>
-
-        <section id="view-browse" class="hidden space-y-4">
-          <h2 class="text-lg font-semibold mb-3">Browse Livestock</h2>
-          <div id="browse-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
-        </section>
-
-        <section id="view-cart" class="hidden space-y-4">
-          <h2 class="text-lg font-semibold mb-3">Your Cart</h2>
-          <div id="cart-list" class="space-y-3"></div>
-          <div id="cart-summary" class="hidden bg-white p-4 rounded-xl border shadow-sm flex items-center justify-between">
-            <p class="text-sm text-gray-700">Total: <span id="cart-total" class="font-bold"></span></p>
-            <button onclick="checkoutCart()" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700">
-              Proceed to checkout
-            </button>
-          </div>
-        </section>
-
-        <section id="view-orders" class="hidden space-y-4">
-          <h2 class="text-lg font-semibold mb-3">My Orders</h2>
-          <div id="orders-list" class="space-y-4"></div>
-        </section>
-
-        <section id="view-profile" class="hidden space-y-4">
-          <h2 class="text-lg font-semibold mb-3">My Profile</h2>
-          <p class="text-sm text-gray-600">Profile details are managed via LocalStorage in this demo.</p>
-        </section>
-      </main>
-    </div>
-  </div>
-
-  <div id="order-summary-modal" class="fixed inset-0 z-30 hidden items-center justify-center bg-black/60">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-2xl text-gray-800 shadow-2xl max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-xl font-semibold">Review your order</h3>
-        <button onclick="closeOrderSummary()" class="text-gray-400 hover:text-gray-600">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
-
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div class="lg:col-span-2 space-y-4">
-          <div>
-            <h4 class="font-semibold mb-2">Items</h4>
-            <div id="order-items" class="space-y-3"></div>
-          </div>
-          <div>
-            <h4 class="font-semibold mb-2">Delivery address</h4>
-            <div id="order-address" class="bg-gray-50 p-3 rounded-lg text-sm"></div>
-          </div>
-        </div>
-
-        <div class="space-y-4">
-          <div class="border rounded-xl p-4 bg-amber-50/60">
-            <h4 class="font-semibold mb-2">Payment method</h4>
-            <label class="flex items-center gap-2 text-sm cursor-pointer mb-2">
-              <input type="radio" name="payment" value="cod" onchange="selectPayment('cod')" />
-              <span>Cash on Delivery</span>
-            </label>
-            <label class="flex items-start gap-2 text-sm cursor-pointer mb-2">
-              <input type="radio" name="payment" value="upi" onchange="selectPayment('upi')" />
-              <div>
-                <p class="font-medium">UPI to <span class="font-mono text-emerald-700">sai.kambala@ybl</span></p>
-                <p class="text-xs text-gray-600">Pay using any UPI app</p>
-              </div>
-            </label>
-            <label class="flex items-start gap-2 text-sm cursor-pointer">
-              <input type="radio" name="payment" value="card" onchange="selectPayment('card')" />
-              <div>
-                <p class="font-medium">Credit / Debit Card</p>
-                <p class="text-xs text-gray-600">Secure payment gateway simulation</p>
-              </div>
-            </label>
-          </div>
-
-          <div class="border rounded-xl p-4 space-y-1 text-sm">
-            <div class="flex justify-between">
-              <span>Items:</span><span id="order-subtotal">₹0</span>
-            </div>
-            <div class="flex justify-between">
-              <span>Delivery:</span><span id="order-delivery">₹0</span>
-            </div>
-            <div class="border-t pt-2 mt-1 flex justify-between font-semibold">
-              <span>Order total:</span><span id="order-total">₹0</span>
-            </div>
-          </div>
-
-          <button onclick="confirmOrder()" class="w-full bg-emerald-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-emerald-700">
-            Place your order
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="payment-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-black/60">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-md text-gray-800 shadow-2xl">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-lg font-semibold" id="payment-modal-title">Complete Payment</h3>
-        <button onclick="closePaymentModal()" class="text-gray-400 hover:text-gray-600">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
-
-      <div id="upi-form" class="hidden space-y-4">
-        <div class="bg-gray-50 p-3 rounded-lg text-sm">
-          <p class="font-medium text-gray-800">Pay to this UPI ID</p>
-          <div class="mt-1 flex items-center justify-between gap-2">
-            <span id="upi-merchant-id" class="font-mono text-green-700 text-sm">
-              sai.kambala@ybl
-            </span>
-            <button type="button" onclick="copyUpiId()" class="text-xs px-2 py-1 rounded-lg border border-emerald-500 text-emerald-600 hover:bg-emerald-50">
-              Copy
-            </button>
-          </div>
-          <p class="text-xs text-gray-500 mt-1">
-            Use any UPI app and pay this ID. Amount: <span id="upi-amount" class="font-semibold">₹0</span>
-          </p>
-        </div>
-        <button type="button" onclick="confirmUpiPaymentDone()" class="w-full bg-green-600 text-white py-2.5 rounded-lg hover:bg-green-700 text-sm font-medium">
-          I have completed payment in my UPI app
-        </button>
-      </div>
-
-      <div id="card-form" class="hidden space-y-4">
-        <div class="bg-gray-50 p-3 rounded-lg text-sm">
-          <p class="font-medium text-gray-800">Credit / Debit Card</p>
-          <p class="text-xs text-gray-500 mt-1">
-            This demo simulates a successful payment.
-          </p>
-        </div>
-        <button type="button" onclick="startCardGatewayCheckout()" class="w-full bg-green-600 text-white py-2.5 rounded-lg hover:bg-green-700 text-sm font-medium">
-          Continue to secure card payment
-        </button>
-      </div>
-
-      <div id="payment-success" class="hidden text-center py-8">
-        <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <i data-lucide="check" class="w-8 h-8 text-green-600"></i>
-        </div>
-        <h3 class="text-lg font-semibold mb-2">Order placed!</h3>
-        <p class="text-gray-600 mb-4">
-          Your order has been created. Track its status from the Orders page.
-        </p>
-        <button onclick="goToOrders()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 text-sm">
-          View orders
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 hidden">
-    <div id="toast-inner" class="px-4 py-2 rounded-lg text-sm shadow-lg bg-gray-900 text-white"></div>
-  </div>
-
-  <script>
-    // --- MOCK DATABASE DATA (Since we have no backend) ---
-    const MOCK_LIVESTOCK = [
-      { _id: 'g1', name: 'Boer Goat', breed: 'Pure Boer', type: 'Goat', age: '14 months', price: 15000, image: '🐐' },
-      { _id: 'g2', name: 'Jamnapari', breed: 'Jamnapari', type: 'Goat', age: '2 years', price: 22000, image: '🐐' },
-      { _id: 's1', name: 'Dumba Sheep', breed: 'Turkish Dumba', type: 'Sheep', age: '10 months', price: 45000, image: '🐑' },
-      { _id: 's2', name: 'Nellore Ram', breed: 'Nellore Jodipi', type: 'Sheep', age: '18 months', price: 18500, image: '🐑' },
-      { _id: 'g3', name: 'Osmanabadi', breed: 'Osmanabadi', type: 'Goat', age: '12 months', price: 12000, image: '🐐' },
-      { _id: 'g4', name: 'Sirohi Kid', breed: 'Sirohi', type: 'Goat', age: '6 months', price: 8500, image: '🐐' },
-    ];
-    
-    // --- LOCAL STORAGE HELPERS ---
-    const LS_KEYS = {
-      USER: 'lm_user',
-      CART: 'lm_cart',
-      ORDERS: 'lm_orders',
-      WISHLIST: 'lm_wishlist'
-    };
-
-    let currentUser = null;
-    let livestock = MOCK_LIVESTOCK;
-    let orders = [];
-    let cart = [];
-    let wishlist = [];
-    let currentAddress = {
-      name: 'Demo User',
-      phone: '9876543210',
-      line1: 'Hitech City',
-      city: 'Hyderabad',
-      state: 'Telangana',
-      pincode: '500081'
-    }; // Hardcoded for demo
-    let currentOrderItems = [];
-    let selectedPaymentMethod = null;
-    let currentOrderTotal = 0;
-    let appInitialized = false;
-
-    function refreshIcons() {
-      if (window.lucide) window.lucide.createIcons();
-    }
-
-    function showToast(msg, type = 'info') {
-      const toast = document.getElementById('toast');
-      const inner = document.getElementById('toast-inner');
-      inner.textContent = msg;
-      inner.className = 'px-4 py-2 rounded-lg text-sm shadow-lg text-white ' +
-        (type === 'success' ? 'bg-emerald-600' : type === 'error' ? 'bg-red-600' : type === 'warning' ? 'bg-amber-500' : 'bg-gray-900');
-      toast.classList.remove('hidden');
-      setTimeout(() => toast.classList.add('hidden'), 2500);
-    }
-
-    function formatINR(amount) {
-      return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount || 0);
-    }
-
-    function showAuthError(msg) {
-      const el = document.getElementById('auth-error');
-      if (el) el.textContent = msg || '';
-    }
-
-    function getInitials(name) {
-      if (!name) return 'U';
-      return name.split(' ').filter(Boolean).map((n) => n[0].toUpperCase()).join('').slice(0, 2);
-    }
-
-    function updateProfileUI() {
-      const avatar = document.getElementById('profile-avatar');
-      const nameEl = document.getElementById('profile-name');
-      const metaEl = document.getElementById('profile-meta');
-      const name = currentUser?.name || 'User';
-      if (avatar) avatar.textContent = getInitials(name);
-      if (nameEl) nameEl.textContent = name;
-      if (metaEl) metaEl.textContent = 'Welcome back';
-    }
-
-    function toggleProfileMenu(force) {
-      const menu = document.getElementById('profile-menu');
-      if (!menu) return;
-      if (typeof force === 'boolean') {
-        if (force) menu.classList.remove('hidden'); else menu.classList.add('hidden');
-        return;
-      }
-      menu.classList.toggle('hidden');
-    }
-
-    // --- REPLACED FETCH WITH LOCAL LOGIC ---
-
-    function handleLogin(e) {
-      e.preventDefault();
-      const email = document.getElementById('login-email').value.trim();
-      if (!email) return showAuthError('Enter email');
-      
-      // Simulate backend login
-      currentUser = { name: 'Demo User', email: email, _id: 'u1' };
-      localStorage.setItem(LS_KEYS.USER, JSON.stringify(currentUser));
-      
-      loadUserState();
-      updateProfileUI();
-      updateCartBadge();
-      showToast('Logged in (Demo Mode)', 'success');
-      showApp();
-    }
-
-    function handleRegister(e) {
-      e.preventDefault();
-      const name = document.getElementById('register-name').value.trim();
-      const email = document.getElementById('register-email').value.trim();
-      
-      currentUser = { name: name || 'User', email: email, _id: 'u' + Date.now() };
-      localStorage.setItem(LS_KEYS.USER, JSON.stringify(currentUser));
-      
-      loadUserState();
-      updateProfileUI();
-      updateCartBadge();
-      showToast('Account created (Demo Mode)', 'success');
-      showApp();
-    }
-
-    function handleLogout() {
-      localStorage.removeItem(LS_KEYS.USER);
-      currentUser = null;
-      cart = [];
-      orders = [];
-      updateCartBadge();
-      toggleProfileMenu(false);
-      showToast('Logged out', 'info');
-      showAuthScreen();
-    }
-
-    function checkAuth() {
-      const stored = localStorage.getItem(LS_KEYS.USER);
-      if (stored) {
-        currentUser = JSON.parse(stored);
-        loadUserState();
-        updateProfileUI();
-        updateCartBadge();
-        showApp();
-      } else {
-        showAuthScreen();
-      }
-    }
-
-    function loadUserState() {
-      // Load cart and orders from LocalStorage
-      const c = localStorage.getItem(LS_KEYS.CART);
-      cart = c ? JSON.parse(c) : [];
-      
-      const o = localStorage.getItem(LS_KEYS.ORDERS);
-      orders = o ? JSON.parse(o) : [];
-    }
-
-    function saveUserState() {
-      localStorage.setItem(LS_KEYS.CART, JSON.stringify(cart));
-      localStorage.setItem(LS_KEYS.ORDERS, JSON.stringify(orders));
-    }
-
-    function loadData() {
-      // Mocking the fetch('/api/livestock') call
-      livestock = MOCK_LIVESTOCK; 
-      
-      // Check which view is active
-      const activeNav = document.querySelector('.nav-item.bg-green-600');
-      let view = 'dashboard';
-      if (activeNav) {
-        const on = activeNav.getAttribute('onclick') || '';
-        view = on.replace("router('", '').replace("')", '') || 'dashboard';
-      }
-      if (view === 'dashboard') renderDashboard();
-      if (view === 'browse') renderBrowse();
-      if (view === 'orders') renderOrders();
-    }
-
-    function showApp() {
-      document.getElementById('auth-screen').classList.add('hidden');
-      document.getElementById('user-app').classList.remove('hidden');
-      if (!appInitialized) {
-        appInitialized = true;
-        initApp();
-      }
-    }
-    function showAuthScreen() {
-      document.getElementById('user-app').classList.add('hidden');
-      document.getElementById('auth-screen').classList.remove('hidden');
-    }
-
-    function router(viewName) {
-      loadData();
-      const titles = {
-        dashboard: 'My Dashboard',
-        browse: 'Browse Livestock',
-        cart: 'Shopping Cart',
-        orders: 'My Orders',
-        profile: 'My Profile',
-      };
-      document.getElementById('page-title').innerText = titles[viewName] || 'My Dashboard';
-
-      ['dashboard', 'browse', 'cart', 'orders', 'profile'].forEach((v) =>
-        document.getElementById('view-' + v)?.classList.add('hidden')
-      );
-      document.getElementById('view-' + viewName)?.classList.remove('hidden');
-
-      document.querySelectorAll('.nav-item').forEach((btn) => {
-        if (btn.getAttribute('onclick').includes(viewName)) {
-          btn.classList.add('bg-green-600', 'text-white');
-          btn.classList.remove('text-gray-700', 'hover:bg-gray-100');
-        } else {
-          btn.classList.remove('bg-green-600', 'text-white');
-          btn.classList.add('text-gray-700', 'hover:bg-gray-100');
+        .payment-option { transition: all 0.3s ease; }
+        .payment-option.selected { border-color: #10b981; background-color: #f0fdf4; }
+        
+        .upi-app-btn {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 1rem; border: 1px solid #e5e7eb; border-radius: 0.75rem;
+            transition: all 0.2s; cursor: pointer;
         }
-      });
+        .upi-app-btn:hover { background-color: #f9fafb; border-color: #d1d5db; }
+    </style>
+</head>
+<body class="h-screen bg-gray-900 text-gray-100">
 
-      if (viewName === 'dashboard') renderDashboard();
-      if (viewName === 'browse') renderBrowse();
-      if (viewName === 'cart') renderCart();
-      if (viewName === 'orders') renderOrders();
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-3 pointer-events-none"></div>
 
-      refreshIcons();
-    }
-
-    function renderDashboard() {
-      const safeOrders = Array.isArray(orders) ? orders : [];
-      const totalSpent = safeOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
-      document.getElementById('dash-total-livestock').innerText = livestock.length;
-      document.getElementById('dash-total-orders').innerText = safeOrders.length;
-      document.getElementById('dash-total-wishlist').innerText = wishlist.length;
-      document.getElementById('dash-total-spent').innerText = formatINR(totalSpent);
-
-      const recentContainer = document.getElementById('dash-recent-orders');
-      if (!safeOrders.length) {
-        recentContainer.innerHTML = '<p class="text-sm text-gray-500">No orders yet.</p>';
-        return;
-      }
-      const recent = safeOrders.slice(0, 3);
-      recentContainer.innerHTML = recent
-        .map((o) => {
-          const itemsArray = Array.isArray(o.items) ? o.items : [];
-          const first = itemsArray[0] || {};
-          const title = first.name || 'Livestock order';
-          const extra = itemsArray.length > 1 ? ` +${itemsArray.length - 1} more` : '';
-          const id = o._id ? String(o._id).slice(-6) : '------';
-          return `
-            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-              <div>
-                <p class="text-sm font-semibold text-gray-800">${title}${extra}</p>
-                <p class="text-xs text-gray-500">#${id} • ${o.date || ''}</p>
-              </div>
-              <div class="text-right text-xs">
-                <p class="font-semibold">${formatINR(o.total || 0)}</p>
-                <p class="text-gray-500">${o.status || 'Processing'}</p>
-              </div>
+    <div id="address-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md text-gray-800 shadow-2xl transform transition-all">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold" id="address-modal-title">Shipping Address</h3>
+                <button onclick="closeAddressModal()" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
             </div>
-          `;
-        })
-        .join('');
-    }
-
-    function renderBrowse() {
-      const grid = document.getElementById('browse-grid');
-      if (!livestock.length) {
-        grid.innerHTML = '<p class="text-sm text-gray-500 col-span-3">No livestock listed yet.</p>';
-        return;
-      }
-      grid.innerHTML = livestock
-        .map(
-          (item) => `
-        <div class="bg-white p-4 rounded-xl border shadow-sm flex flex-col">
-          <div class="h-32 bg-gray-100 rounded-lg flex items-center justify-center text-6xl mb-3">
-            ${item.image || '🐐'}
-          </div>
-          <div class="flex-1 space-y-1 text-sm">
-            <p class="font-semibold text-gray-800">${item.name}</p>
-            <p class="text-gray-500">${item.breed}</p>
-            <p class="text-xs text-gray-400">${item.type} • Age: ${item.age}</p>
-          </div>
-          <div class="mt-3 flex items-center justify-between">
-            <p class="font-bold text-emerald-700">${formatINR(item.price)}</p>
-            <div class="flex gap-2">
-              <button onclick="addToCart('${item._id}')" class="px-3 py-1.5 rounded-lg text-xs bg-emerald-600 text-white hover:bg-emerald-700">
-                Add to cart
-              </button>
-              <button onclick="buyNow('${item._id}')" class="px-3 py-1.5 rounded-lg text-xs bg-amber-500 text-white hover:bg-amber-600">
-                Buy now
-              </button>
-            </div>
-          </div>
+            <form id="address-form" class="space-y-3" onsubmit="submitAddress(event)">
+                <input id="addr-name" type="text" placeholder="Full Name" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" required>
+                <input id="addr-phone" type="tel" pattern="[0-9]{10}" placeholder="Phone Number" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" required>
+                <textarea id="addr-line" rows="2" placeholder="Address (House No, Street)" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" required></textarea>
+                <div class="grid grid-cols-2 gap-3">
+                    <input id="addr-city" type="text" placeholder="City" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" required>
+                    <input id="addr-state" type="text" placeholder="State" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" required>
+                </div>
+                <input id="addr-pincode" type="tel" pattern="[0-9]{6}" placeholder="Pincode" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" required>
+                <button type="submit" class="w-full py-2.5 mt-2 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700">Save Address</button>
+            </form>
         </div>
-      `
-        )
-        .join('');
-      refreshIcons();
-    }
+    </div>
 
-    function renderCart() {
-      const list = document.getElementById('cart-list');
-      const summary = document.getElementById('cart-summary');
-      if (!cart.length) {
-        list.innerHTML = '<p class="text-sm text-gray-500">Your cart is empty.</p>';
-        summary.classList.add('hidden');
-        updateCartBadge();
-        return;
-      }
-      list.innerHTML = cart
-        .map(
-          (item, idx) => `
-        <div class="bg-white p-3 rounded-xl border shadow-sm flex items-center justify-between gap-3">
-          <div class="flex items-center gap-3">
-            <div class="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center text-3xl">${item.image || '🐐'}</div>
-            <div class="text-sm">
-              <p class="font-semibold text-gray-800">${item.name}</p>
-              <p class="text-xs text-gray-500">${item.breed}</p>
+    <div id="order-summary-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-2xl text-gray-800 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-semibold">Order Summary</h3>
+                <button onclick="closeOrderSummary()" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
             </div>
-          </div>
-          <div class="flex items-center gap-4 text-sm">
-            <p class="font-semibold">${formatINR(item.price)}</p>
-            <button onclick="removeFromCart(${idx})" class="text-xs text-red-500 hover:text-red-600">Remove</button>
-          </div>
-        </div>
-      `
-        )
-        .join('');
-      const total = cart.reduce((sum, i) => sum + (i.price || 0), 0);
-      document.getElementById('cart-total').textContent = formatINR(total);
-      summary.classList.remove('hidden');
-      updateCartBadge();
-    }
 
-    function updateCartBadge() {
-      const badge = document.getElementById('header-cart-badge');
-      if (!badge) return;
-      const count = cart.length;
-      badge.textContent = count;
-      if (count > 0) badge.classList.remove('hidden'); else badge.classList.add('hidden');
-    }
-
-    function addToCart(id) {
-      const item = livestock.find((i) => i._id === id);
-      if (!item) return;
-      cart.push({ ...item });
-      saveUserState();
-      renderCart();
-      renderDashboard();
-      showToast('Added to cart', 'success');
-    }
-
-    function removeFromCart(index) {
-      cart.splice(index, 1);
-      saveUserState();
-      renderCart();
-    }
-
-    function buyNow(id) {
-      const item = livestock.find((i) => i._id === id);
-      if (!item) return;
-      currentOrderItems = [{ ...item }];
-      showOrderSummary();
-    }
-
-    function checkoutCart() {
-      if (!cart.length) return showToast('Your cart is empty', 'warning');
-      currentOrderItems = cart.map((i) => ({ ...i }));
-      showOrderSummary();
-    }
-
-    function showOrderSummary() {
-      if (!currentOrderItems.length) return showToast('No items in order', 'error');
-      const modal = document.getElementById('order-summary-modal');
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-
-      const subtotal = currentOrderItems.reduce((s, i) => s + (i.price || 0), 0);
-      const delivery = subtotal > 5000 ? 0 : 200;
-      const total = subtotal + delivery;
-      currentOrderTotal = total;
-
-      const itemsEl = document.getElementById('order-items');
-      itemsEl.innerHTML = currentOrderItems
-        .map(
-          (item) => `
-        <div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg text-sm">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg bg-white flex items-center justify-center text-2xl border">${item.image || '🐐'}</div>
-            <div>
-              <p class="font-semibold text-gray-800">${item.name}</p>
-              <p class="text-xs text-gray-500">${item.breed}</p>
-            </div>
-          </div>
-          <p class="font-semibold">${formatINR(item.price)}</p>
-        </div>
-      `
-        )
-        .join('');
-
-      const addrEl = document.getElementById('order-address');
-      if (currentAddress) {
-        addrEl.innerHTML = `
-          <p class="font-semibold">${currentAddress.name}</p>
-          <p>${currentAddress.line1}</p>
-          ${currentAddress.line2 ? `<p>${currentAddress.line2}</p>` : ''}
-          <p>${currentAddress.city}, ${currentAddress.state} - ${currentAddress.pincode}</p>
-          <p>📱 +91 ${currentAddress.phone}</p>
-        `;
-      } else {
-        addrEl.innerHTML = '<p class="text-sm text-gray-500">No address saved.</p>';
-      }
-
-      document.getElementById('order-subtotal').textContent = formatINR(subtotal);
-      document.getElementById('order-delivery').textContent = delivery === 0 ? 'FREE' : formatINR(delivery);
-      document.getElementById('order-total').textContent = formatINR(total);
-      const upiAmountEl = document.getElementById('upi-amount');
-      if (upiAmountEl) upiAmountEl.textContent = formatINR(total);
-    }
-
-    function closeOrderSummary() {
-      const modal = document.getElementById('order-summary-modal');
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-    }
-
-    function selectPayment(method) {
-      selectedPaymentMethod = method;
-    }
-
-    async function confirmOrder() {
-      if (!selectedPaymentMethod) return showToast('Select a payment method', 'warning');
-      if (selectedPaymentMethod === 'cod') {
-        await createOrder();
-      } else {
-        closeOrderSummary();
-        showPaymentModal(selectedPaymentMethod);
-      }
-    }
-
-    function createOrder() {
-      // Mocking order creation
-      const items = currentOrderItems.map((i) => ({
-        id: i._id, name: i.name, price: i.price, breed: i.breed, image: i.image,
-      }));
-      const subtotal = currentOrderItems.reduce((s, i) => s + (i.price || 0), 0);
-      const delivery = subtotal > 5000 ? 0 : 200;
-      const total = subtotal + delivery;
-
-      const newOrder = {
-        _id: 'ord-' + Date.now(),
-        items,
-        total,
-        status: 'Processing',
-        date: new Date().toLocaleDateString(),
-        paymentMethod: selectedPaymentMethod || 'cod',
-        tracking: [
-            { label: 'Order Placed', completed: true },
-            { label: 'Packed', completed: false },
-            { label: 'Shipped', completed: false },
-            { label: 'Delivered', completed: false },
-        ]
-      };
-
-      orders.unshift(newOrder);
-      currentOrderItems = [];
-      cart = [];
-      saveUserState();
-      renderCart();
-      renderDashboard();
-
-      const upiForm = document.getElementById('upi-form');
-      const cardForm = document.getElementById('card-form');
-      const success = document.getElementById('payment-success');
-      if (upiForm) upiForm.classList.add('hidden');
-      if (cardForm) cardForm.classList.add('hidden');
-      if (success) success.classList.remove('hidden');
-      document.getElementById('payment-modal').classList.remove('hidden');
-      document.getElementById('payment-modal').classList.add('flex');
-    }
-
-    function showPaymentModal(method) {
-      const modal = document.getElementById('payment-modal');
-      const title = document.getElementById('payment-modal-title');
-      const upiForm = document.getElementById('upi-form');
-      const cardForm = document.getElementById('card-form');
-      const success = document.getElementById('payment-success');
-      if (upiForm) upiForm.classList.add('hidden');
-      if (cardForm) cardForm.classList.add('hidden');
-      if (success) success.classList.add('hidden');
-
-      if (method === 'upi') {
-        title.textContent = 'UPI Payment';
-        upiForm.classList.remove('hidden');
-        const upiAmountEl = document.getElementById('upi-amount');
-        if (upiAmountEl) upiAmountEl.textContent = formatINR(currentOrderTotal || 0);
-      } else if (method === 'card') {
-        title.textContent = 'Card Payment';
-        cardForm.classList.remove('hidden');
-      }
-
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-      refreshIcons();
-    }
-
-    function closePaymentModal() {
-      const modal = document.getElementById('payment-modal');
-      if (!modal) return;
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-    }
-
-    function copyUpiId() {
-      const id = 'sai.kambala@ybl';
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(id).then(() => showToast('UPI ID copied', 'success'));
-      } else {
-        showToast('Long-press to copy UPI ID', 'info');
-      }
-    }
-
-    function confirmUpiPaymentDone() {
-      showToast('Marking order as paid via UPI', 'success');
-      createOrder();
-    }
-
-    function startCardGatewayCheckout() {
-      showToast('Simulating secure card payment...', 'info');
-      createOrder();
-    }
-
-    function goToOrders() {
-      closePaymentModal();
-      router('orders');
-    }
-
-    function cancelOrder(orderId) {
-      const idx = orders.findIndex((o) => o._id === orderId);
-      if (idx !== -1) {
-        orders[idx].status = 'Cancelled';
-        saveUserState();
-        renderOrders();
-        renderDashboard();
-        showToast('Order cancelled', 'success');
-      }
-    }
-
-    function renderOrders() {
-      const list = document.getElementById('orders-list');
-      if (!orders.length) {
-        list.innerHTML = '<p class="text-sm text-gray-500">You have no orders yet.</p>';
-        return;
-      }
-      list.innerHTML = orders
-        .map((order) => {
-          const id = order._id ? String(order._id).slice(-6) : '------';
-          const itemsArray = Array.isArray(order.items) ? order.items : [];
-          const first = itemsArray[0] || {};
-          const extra = itemsArray.length > 1 ? ` +${itemsArray.length - 1} more` : '';
-          const paymentBadge = order.paymentMethod === 'upi' ? '<span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Paid via UPI</span>' : order.paymentMethod === 'card' ? '<span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Paid via card</span>' : '<span class="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">Cash on delivery</span>';
-
-          let statusBadge = '';
-          if (order.status === 'Cancelled') {
-            statusBadge = '<span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Cancelled</span>';
-          } else {
-            statusBadge = `<span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">${order.status}</span>`;
-          }
-
-          const steps = order.tracking || [];
-          const trackHtml = `
-            <div class="mt-3">
-              <div class="flex justify-between text-[11px] text-gray-500 mb-2">
-                ${steps.map((s) => `
-                  <div class="flex-1 flex flex-col items-center ${s.completed ? 'text-emerald-600' : ''}">
-                    <div class="w-6 h-6 rounded-full flex items-center justify-center border ${s.completed ? 'bg-emerald-500 text-white border-emerald-500 step-active' : 'bg-white border-gray-300'}">
-                      ${s.completed ? '✓' : ''}
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="space-y-6">
+                    <div>
+                        <h4 class="font-semibold text-sm text-gray-500 mb-2 uppercase tracking-wide">Items</h4>
+                        <div id="order-items" class="space-y-3 max-h-40 overflow-y-auto pr-2"></div>
                     </div>
-                    <span class="mt-1 text-[10px] text-center">${s.label}</span>
-                  </div>
-                `).join('')}
-              </div>
-              <div class="h-1 w-full bg-gray-200 rounded-full overflow-hidden">
-                <div class="h-full bg-emerald-500 transition-all" style="width:${(steps.filter((s) => s.completed).length / steps.length) * 100}%"></div>
-              </div>
-            </div>
-          `;
+                    <div>
+                        <h4 class="font-semibold text-sm text-gray-500 mb-2 uppercase tracking-wide">Delivering To</h4>
+                        <div id="order-address" class="bg-gray-50 p-3 rounded-lg border border-gray-100 text-sm"></div>
+                        <button onclick="changeAddress()" class="mt-2 text-xs text-blue-600 font-medium hover:underline">Change Address</button>
+                    </div>
+                </div>
 
-          return `
-            <div class="bg-white p-4 rounded-xl border shadow-sm">
-              <div class="flex items-start justify-between gap-3">
+                <div class="space-y-6">
+                     <div>
+                        <h4 class="font-semibold text-sm text-gray-500 mb-2 uppercase tracking-wide">Payment Method</h4>
+                        <div class="space-y-2">
+                             <div class="payment-option border rounded-lg p-3 cursor-pointer flex items-center gap-3" onclick="selectPayment('upi')">
+                                <input type="radio" name="payment" value="upi" class="text-emerald-600">
+                                <div>
+                                    <p class="font-medium text-sm">Pay via UPI</p>
+                                    <p class="text-xs text-gray-500">GPay, PhonePe, Paytm, QR</p>
+                                </div>
+                            </div>
+                            <div class="payment-option border rounded-lg p-3 cursor-pointer flex items-center gap-3" onclick="selectPayment('cod')">
+                                <input type="radio" name="payment" value="cod" class="text-emerald-600">
+                                <div>
+                                    <p class="font-medium text-sm">Cash on Delivery</p>
+                                    <p class="text-xs text-gray-500">Pay cash upon arrival</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 p-4 rounded-lg space-y-2">
+                        <div class="flex justify-between text-sm"><span>Subtotal</span><span id="order-subtotal">₹0</span></div>
+                        <div class="flex justify-between text-sm"><span>Delivery</span><span id="order-delivery">₹0</span></div>
+                        <div class="flex justify-between font-bold text-lg pt-2 border-t mt-2"><span>Total</span><span id="order-total">₹0</span></div>
+                    </div>
+
+                    <button onclick="confirmOrder()" class="w-full py-3 bg-gray-900 text-white rounded-lg hover:bg-black font-medium shadow-lg transform active:scale-[0.98] transition">
+                        Place Order
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="payment-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl p-0 w-full max-w-md text-gray-800 shadow-2xl overflow-hidden relative">
+            
+            <div class="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
+                <h3 class="font-bold text-lg">Complete Payment</h3>
+                <button onclick="closePaymentModal()" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <div class="p-6">
+                <div class="text-center mb-6">
+                    <p class="text-gray-500 text-sm">Amount to Pay</p>
+                    <h2 class="text-3xl font-bold text-gray-900" id="pay-amount-display">₹0</h2>
+                    <p class="text-xs text-emerald-600 font-medium mt-1">Paying to: sai.kambala@ybl</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mb-6">
+                    <button onclick="payWithApp('gpay')" class="upi-app-btn">
+                        <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold mb-2">G</div>
+                        <span class="text-xs font-medium">Google Pay</span>
+                    </button>
+                    <button onclick="payWithApp('phonepe')" class="upi-app-btn">
+                         <div class="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold mb-2">P</div>
+                        <span class="text-xs font-medium">PhonePe</span>
+                    </button>
+                    <button onclick="payWithApp('paytm')" class="upi-app-btn">
+                         <div class="w-10 h-10 bg-blue-400 rounded-full flex items-center justify-center text-white font-bold mb-2">Pay</div>
+                        <span class="text-xs font-medium">Paytm</span>
+                    </button>
+                    <button onclick="payWithApp('bhim')" class="upi-app-btn">
+                         <div class="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold mb-2">B</div>
+                        <span class="text-xs font-medium">BHIM / Other</span>
+                    </button>
+                </div>
+
+                <div class="border-t pt-4 text-center">
+                    <p class="text-xs text-gray-500 mb-3">Scan to Pay</p>
+                    <div id="qrcode" class="flex justify-center mb-3"></div>
+                    <p class="text-[10px] text-gray-400">Scan using any UPI app</p>
+                </div>
+                
+                <button onclick="verifyPayment()" class="w-full mt-4 bg-emerald-600 text-white py-3 rounded-lg font-medium hover:bg-emerald-700">
+                    I have made the payment
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="success-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-md">
+        <div class="bg-white rounded-2xl p-8 w-full max-w-sm text-center shadow-2xl animate-bounce-in">
+            <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i data-lucide="check" class="w-10 h-10 text-green-600"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-gray-800 mb-2">Order Placed!</h3>
+            <p class="text-gray-500 mb-6">Thank you for shopping with us.</p>
+            <button onclick="goToOrders()" class="w-full bg-gray-900 text-white py-3 rounded-lg font-medium hover:bg-black">
+                View My Orders
+            </button>
+        </div>
+    </div>
+
+    <div id="auth-screen" class="hidden fixed inset-0 z-20 flex items-center justify-center px-4 bg-gradient-to-br from-green-900 via-gray-900 to-black">
+        <div class="max-w-md w-full">
+             <div id="auth-card" class="auth-card auth-glass rounded-3xl p-8 shadow-2xl border border-white/10">
+                <div class="auth-panel auth-panel-login">
+                    <h2 class="text-2xl font-bold text-white mb-2">Welcome Back</h2>
+                    <p class="text-gray-400 text-sm mb-6">Sign in to LivestockMart</p>
+                    <form id="login-form" class="space-y-4">
+                        <input id="login-email" type="email" placeholder="Email Address" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-emerald-500 outline-none" required>
+                        <input id="login-password" type="password" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-emerald-500 outline-none" required>
+                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition">Sign In</button>
+                    </form>
+                    <p class="mt-4 text-center text-sm text-gray-400">Don't have an account? <button onclick="switchAuthView('register')" class="text-emerald-400 hover:underline">Register</button></p>
+                </div>
+                <div class="auth-panel auth-panel-register">
+                    <h2 class="text-2xl font-bold text-white mb-2">Create Account</h2>
+                    <p class="text-gray-400 text-sm mb-6">Join the marketplace</p>
+                    <form id="register-form" class="space-y-4">
+                        <input id="register-name" type="text" placeholder="Full Name" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-emerald-500 outline-none" required>
+                        <input id="register-email" type="email" placeholder="Email Address" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-emerald-500 outline-none" required>
+                        <input id="register-password" type="password" placeholder="Create Password" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-emerald-500 outline-none" required>
+                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition">Create Account</button>
+                    </form>
+                    <p class="mt-4 text-center text-sm text-gray-400">Already have an account? <button onclick="switchAuthView('login')" class="text-emerald-400 hover:underline">Login</button></p>
+                </div>
+             </div>
+        </div>
+    </div>
+
+    <div id="user-app" class="hidden h-screen w-full bg-gray-50 text-gray-800 flex overflow-hidden">
+        <aside class="w-64 bg-white border-r border-gray-200 flex flex-col z-10 hidden md:flex">
+            <div class="p-6 flex items-center gap-3">
+                <div class="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white font-bold">L</div>
+                <span class="text-xl font-bold text-gray-800">LivestockMart</span>
+            </div>
+            <nav class="flex-1 px-4 space-y-2 py-4">
+                <button onclick="router('browse')" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"><i data-lucide="store" class="w-5 h-5"></i> Marketplace</button>
+                <button onclick="router('orders')" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"><i data-lucide="package" class="w-5 h-5"></i> My Orders</button>
+                <button onclick="router('cart')" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors">
+                    <i data-lucide="shopping-cart" class="w-5 h-5"></i> My Cart
+                    <span id="sidebar-cart-badge" class="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full hidden">0</span>
+                </button>
+                <button onclick="router('wishlist')" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"><i data-lucide="heart" class="w-5 h-5"></i> Wishlist</button>
+                <button onclick="router('addresses')" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"><i data-lucide="map-pin" class="w-5 h-5"></i> Addresses</button>
+                <div class="mt-auto border-t pt-4">
+                    <button onclick="handleLogout()" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 transition-colors"><i data-lucide="log-out" class="w-5 h-5"></i> Logout</button>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="flex-1 flex flex-col relative overflow-hidden">
+            <header class="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center z-10">
                 <div>
-                  <p class="text-sm font-semibold text-gray-800">Order #${id}</p>
-                  <p class="text-xs text-gray-500">${order.date || ''}</p>
-                  <p class="text-xs text-gray-500 mt-1">${first.name || 'Livestock order'}${extra}</p>
-                  <p class="text-sm font-semibold mt-1">${formatINR(order.total || 0)}</p>
+                    <h1 id="page-title" class="text-2xl font-bold text-gray-800">Marketplace</h1>
                 </div>
-                <div class="flex flex-col items-end gap-1">
-                  ${statusBadge}
-                  ${paymentBadge}
-                  ${order.status === 'Processing' ? `<button onclick="cancelOrder('${order._id}')" class="mt-1 text-xs text-red-600 hover:text-red-700">Cancel order</button>` : ''}
+                <div class="flex items-center gap-6">
+                    <button onclick="router('cart')" class="relative p-2 hover:bg-gray-100 rounded-full transition">
+                        <i data-lucide="shopping-cart" class="w-6 h-6 text-gray-700"></i>
+                        <span id="header-cart-badge" class="absolute top-0 right-0 bg-red-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full hidden shadow-sm">0</span>
+                    </button>
+                    
+                    <div class="flex items-center gap-3 pl-4 border-l">
+                        <div class="text-right hidden sm:block">
+                            <p id="profile-name" class="text-sm font-semibold">User</p>
+                            <p class="text-xs text-gray-500">Online</p>
+                        </div>
+                        <div id="profile-avatar" class="w-9 h-9 bg-green-100 text-green-700 rounded-full flex items-center justify-center font-bold">U</div>
+                    </div>
                 </div>
-              </div>
-              ${trackHtml}
+            </header>
+
+            <div id="content-area" class="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-50 hide-scrollbar">
+                
+                <div id="view-browse" class="space-y-6">
+                    <div class="flex gap-4 mb-6">
+                        <input type="text" id="search-input" oninput="renderBrowse()" placeholder="Search livestock..." class="flex-1 p-3 border rounded-xl shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                        <select onchange="filterCategory(this.value)" class="p-3 border rounded-xl shadow-sm bg-white outline-none">
+                            <option value="All">All Types</option>
+                            <option value="Goat">Goats</option>
+                            <option value="Sheep">Sheep</option>
+                        </select>
+                    </div>
+                    <div id="livestock-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
+                </div>
+
+                <div id="view-cart" class="hidden max-w-4xl mx-auto space-y-6">
+                    <h2 class="text-xl font-bold">Shopping Cart</h2>
+                    <div id="cart-items-container" class="space-y-4"></div>
+                    <div id="cart-footer" class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center hidden">
+                        <div>
+                            <p class="text-gray-500 text-sm">Total Amount</p>
+                            <h3 class="text-2xl font-bold" id="cart-total-main">₹0</h3>
+                        </div>
+                        <button onclick="checkout()" class="bg-gray-900 text-white px-8 py-3 rounded-xl font-medium hover:bg-black transition">Proceed to Checkout</button>
+                    </div>
+                </div>
+
+                <div id="view-orders" class="hidden max-w-4xl mx-auto space-y-6">
+                    <h2 class="text-xl font-bold">My Orders</h2>
+                    <div id="orders-list" class="space-y-4"></div>
+                </div>
+
+                <div id="view-wishlist" class="hidden space-y-6">
+                    <h2 class="text-xl font-bold">My Wishlist</h2>
+                    <div id="wishlist-grid" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
+                </div>
+
+                <div id="view-addresses" class="hidden max-w-2xl mx-auto space-y-6">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xl font-bold">Saved Addresses</h2>
+                        <button onclick="openAddressModal()" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700">+ Add New</button>
+                    </div>
+                    <div id="addresses-container" class="space-y-4"></div>
+                </div>
+
             </div>
-          `;
-        })
-        .join('');
-    }
+        </main>
+    </div>
 
-    function initApp() {
-      document.getElementById('current-date').textContent = new Date().toLocaleString('en-IN', {
-        weekday: 'short', day: '2-digit', month: 'short', year: 'numeric',
-      });
-      router('dashboard');
-    }
+    <script>
+        const API_URL = '/api';
+        const UPI_ID = 'sai.kambala@ybl'; // YOUR UPI ID
 
-    document.addEventListener('DOMContentLoaded', () => {
-      const tabLogin = document.getElementById('tab-login');
-      const tabRegister = document.getElementById('tab-register');
-      const loginForm = document.getElementById('login-form');
-      const registerForm = document.getElementById('register-form');
+        let livestock = [], orders = [], cart = [], wishlist = [], addresses = [];
+        let currentUser = null;
+        let currentAddress = null;
+        let currentOrderItems = [];
+        let selectedPaymentMethod = null;
+        let currentTotalToPay = 0;
 
-      tabLogin.addEventListener('click', () => {
-        tabLogin.classList.add('bg-white', 'shadow', 'text-gray-900');
-        tabRegister.classList.remove('bg-white', 'shadow', 'text-gray-900');
-        tabRegister.classList.add('text-gray-500');
-        loginForm.classList.remove('hidden');
-        registerForm.classList.add('hidden');
-      });
-      tabRegister.addEventListener('click', () => {
-        tabRegister.classList.add('bg-white', 'shadow', 'text-gray-900');
-        tabLogin.classList.remove('bg-white', 'shadow', 'text-gray-900');
-        tabLogin.classList.add('text-gray-500');
-        registerForm.classList.remove('hidden');
-        loginForm.classList.add('hidden');
-      });
+        // --- CORE FUNCTIONS ---
 
-      loginForm.addEventListener('submit', handleLogin);
-      registerForm.addEventListener('submit', handleRegister);
-      checkAuth();
-      refreshIcons();
-    });
-  </script>
+        function refreshIcons() {
+            if (window.lucide) window.lucide.createIcons();
+        }
+
+        function showToast(msg, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const div = document.createElement('div');
+            const colors = { success: 'bg-emerald-600', error: 'bg-red-600', info: 'bg-gray-800' };
+            div.className = `${colors[type]} text-white px-4 py-3 rounded-xl shadow-lg text-sm flex items-center gap-2 animate-pulse`;
+            div.innerHTML = `<span>${msg}</span>`;
+            container.appendChild(div);
+            setTimeout(() => div.remove(), 3000);
+        }
+
+        function formatINR(val) { return '₹' + Number(val).toLocaleString('en-IN'); }
+
+        // --- AUTH ---
+
+        async function checkAuth() {
+            try {
+                const res = await fetch(`${API_URL}/auth/me`);
+                if (res.ok) {
+                    const data = await res.json();
+                    currentUser = data.user;
+                    showApp();
+                    loadUserState();
+                    loadData();
+                } else {
+                    document.getElementById('auth-screen').classList.remove('hidden');
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function showApp() {
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('user-app').classList.remove('hidden');
+            document.getElementById('profile-name').innerText = currentUser.name;
+            document.getElementById('profile-avatar').innerText = currentUser.name.charAt(0).toUpperCase();
+            refreshIcons();
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const res = await fetch(`${API_URL}/auth/login`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email, password})
+            });
+            if (res.ok) window.location.reload();
+            else showToast('Login failed', 'error');
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const name = document.getElementById('register-name').value;
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+            const res = await fetch(`${API_URL}/auth/register`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name, email, password})
+            });
+            if (res.ok) window.location.reload();
+            else showToast('Registration failed', 'error');
+        }
+
+        function switchAuthView(view) {
+            const card = document.getElementById('auth-card');
+            if(view === 'register') card.classList.add('show-register');
+            else card.classList.remove('show-register');
+        }
+
+        function handleLogout() {
+            fetch(`${API_URL}/auth/logout`, {method: 'POST'}).then(() => window.location.reload());
+        }
+
+        // --- DATA ---
+
+        async function loadData() {
+            const [lsRes, ordRes] = await Promise.all([
+                fetch(`${API_URL}/livestock`),
+                fetch(`${API_URL}/orders`)
+            ]);
+            livestock = await lsRes.json();
+            orders = await ordRes.json();
+            renderBrowse();
+        }
+
+        async function loadUserState() {
+            const res = await fetch(`${API_URL}/user/state`);
+            if(res.ok) {
+                const data = await res.json();
+                cart = data.cart;
+                wishlist = data.wishlist;
+                addresses = data.addresses;
+                if(addresses.length > 0) currentAddress = addresses[0];
+                updateCartBadge();
+            }
+        }
+
+        async function saveUserState() {
+            await fetch(`${API_URL}/user/state`, {
+                method: 'PUT', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({cart, wishlist, addresses})
+            });
+        }
+
+        // --- NAVIGATION ---
+
+        function router(view) {
+            document.querySelectorAll('[id^="view-"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`view-${view}`).classList.remove('hidden');
+            
+            // Title Update
+            const titles = {browse: 'Marketplace', cart: 'Shopping Cart', orders: 'My Orders', wishlist: 'Wishlist', addresses: 'Addresses'};
+            document.getElementById('page-title').innerText = titles[view];
+
+            if(view === 'browse') renderBrowse();
+            if(view === 'cart') renderCart();
+            if(view === 'orders') renderOrders();
+            if(view === 'wishlist') renderWishlist();
+            if(view === 'addresses') renderAddresses();
+            refreshIcons();
+        }
+
+        // --- RENDERERS ---
+
+        function renderBrowse() {
+            const term = document.getElementById('search-input').value.toLowerCase();
+            const grid = document.getElementById('livestock-grid');
+            grid.innerHTML = livestock.filter(i => i.name.toLowerCase().includes(term) || i.breed.toLowerCase().includes(term)).map(item => `
+                <div class="bg-white p-4 rounded-xl border hover:shadow-lg transition">
+                    <div class="h-40 bg-gray-100 rounded-lg flex items-center justify-center text-6xl mb-4 relative">
+                        ${item.image}
+                        <button onclick="toggleWishlist('${item._id}')" class="absolute top-2 right-2 p-2 bg-white rounded-full shadow hover:text-red-500 ${wishlist.includes(item._id)?'text-red-500':''}">
+                            <i data-lucide="heart" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                    <div class="flex justify-between items-start">
+                        <div><h3 class="font-bold">${item.name}</h3><p class="text-xs text-gray-500">${item.breed}</p></div>
+                        <span class="font-bold text-emerald-600">${formatINR(item.price)}</span>
+                    </div>
+                    <button onclick="addToCart('${item._id}')" class="w-full mt-4 bg-gray-900 text-white py-2 rounded-lg text-sm hover:bg-black">Add to Cart</button>
+                </div>
+            `).join('');
+            refreshIcons();
+        }
+
+        function renderCart() {
+            const container = document.getElementById('cart-items-container');
+            if(cart.length === 0) {
+                container.innerHTML = '<div class="text-center py-10 text-gray-400">Cart is empty</div>';
+                document.getElementById('cart-footer').classList.add('hidden');
+                return;
+            }
+            document.getElementById('cart-footer').classList.remove('hidden');
+            let total = 0;
+            container.innerHTML = cart.map((item, idx) => {
+                total += item.price;
+                return `
+                <div class="flex items-center justify-between p-4 bg-white rounded-xl border">
+                    <div class="flex items-center gap-4">
+                        <div class="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">${item.image}</div>
+                        <div><h4 class="font-bold">${item.name}</h4><p class="text-xs text-gray-500">${formatINR(item.price)}</p></div>
+                    </div>
+                    <button onclick="removeFromCart(${idx})" class="text-red-500 hover:bg-red-50 p-2 rounded"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                </div>`;
+            }).join('');
+            document.getElementById('cart-total-main').innerText = formatINR(total);
+            refreshIcons();
+        }
+
+        function renderOrders() {
+            const list = document.getElementById('orders-list');
+            if(orders.length === 0) { list.innerHTML = '<div class="text-center py-10 text-gray-400">No orders yet</div>'; return; }
+            
+            list.innerHTML = orders.map(o => `
+                <div class="bg-white p-6 rounded-xl border shadow-sm">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <p class="font-bold">Order #${String(o._id).slice(-6)}</p>
+                            <p class="text-xs text-gray-500">${o.date}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-bold">${formatINR(o.total)}</p>
+                            <span class="text-xs px-2 py-1 rounded-full ${o.status==='Cancelled'?'bg-red-100 text-red-700': o.status==='Delivered'?'bg-green-100 text-green-700':'bg-yellow-100 text-yellow-800'}">${o.status}</span>
+                        </div>
+                    </div>
+                    <div class="space-y-2 mb-4">
+                        ${o.items.map(i => `<div class="flex justify-between text-sm text-gray-600"><span>${i.name}</span><span>${formatINR(i.price)}</span></div>`).join('')}
+                    </div>
+                    ${o.status === 'Processing' ? `<button onclick="cancelOrder('${o._id}')" class="text-red-600 text-sm hover:underline">Cancel Order</button>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function renderAddresses() {
+            const div = document.getElementById('addresses-container');
+            if(addresses.length === 0) { div.innerHTML = '<p class="text-gray-500">No addresses saved.</p>'; return; }
+            div.innerHTML = addresses.map(a => `
+                <div class="border p-4 rounded-lg bg-white">
+                    <p class="font-bold">${a.name}</p>
+                    <p class="text-sm text-gray-600">${a.line1}, ${a.city} - ${a.pincode}</p>
+                    <p class="text-sm text-gray-600">Phone: ${a.phone}</p>
+                </div>
+            `).join('');
+        }
+
+        // --- ACTIONS ---
+
+        function addToCart(id) {
+            const item = livestock.find(i => i._id === id);
+            cart.push({...item, selected: true});
+            updateCartBadge();
+            saveUserState();
+            showToast('Added to cart', 'success');
+        }
+
+        function removeFromCart(idx) {
+            cart.splice(idx, 1);
+            saveUserState();
+            renderCart();
+            updateCartBadge();
+        }
+
+        function toggleWishlist(id) {
+            if(wishlist.includes(id)) wishlist = wishlist.filter(i => i !== id);
+            else wishlist.push(id);
+            saveUserState();
+            renderBrowse();
+        }
+
+        function updateCartBadge() {
+            const count = cart.length;
+            const b1 = document.getElementById('sidebar-cart-badge');
+            const b2 = document.getElementById('header-cart-badge');
+            [b1, b2].forEach(b => {
+                if(b) {
+                    b.innerText = count;
+                    if(count > 0) b.classList.remove('hidden'); else b.classList.add('hidden');
+                }
+            });
+        }
+
+        // --- CHECKOUT FLOW ---
+
+        function checkout() {
+            if(cart.length === 0) return;
+            currentOrderItems = cart;
+            showOrderSummary();
+        }
+
+        function showOrderSummary() {
+            if(!currentAddress && addresses.length === 0) { openAddressModal(); return; }
+            if(!currentAddress) currentAddress = addresses[0];
+
+            document.getElementById('order-summary-modal').classList.remove('hidden');
+            document.getElementById('order-summary-modal').classList.add('flex');
+
+            const itemsDiv = document.getElementById('order-items');
+            let subtotal = 0;
+            itemsDiv.innerHTML = currentOrderItems.map(i => {
+                subtotal += i.price;
+                return `<div class="flex justify-between text-sm"><span>${i.name}</span><span class="font-medium">${formatINR(i.price)}</span></div>`;
+            }).join('');
+
+            const delivery = subtotal > 5000 ? 0 : 200;
+            currentTotalToPay = subtotal + delivery;
+
+            document.getElementById('order-subtotal').innerText = formatINR(subtotal);
+            document.getElementById('order-delivery').innerText = delivery === 0 ? 'Free' : formatINR(delivery);
+            document.getElementById('order-total').innerText = formatINR(currentTotalToPay);
+
+            const addrDiv = document.getElementById('order-address');
+            addrDiv.innerHTML = `<p class="font-bold">${currentAddress.name}</p><p>${currentAddress.line1}, ${currentAddress.city}</p>`;
+        }
+
+        function closeOrderSummary() {
+            document.getElementById('order-summary-modal').classList.add('hidden');
+            document.getElementById('order-summary-modal').classList.remove('flex');
+        }
+
+        function selectPayment(method) {
+            selectedPaymentMethod = method;
+            document.querySelectorAll('.payment-option').forEach(el => {
+                el.classList.remove('selected', 'border-emerald-500', 'bg-emerald-50');
+                if(el.querySelector(`input[value="${method}"]`)) el.classList.add('selected', 'border-emerald-500', 'bg-emerald-50');
+            });
+        }
+
+        async function confirmOrder() {
+            if(!selectedPaymentMethod) { showToast('Select payment method', 'error'); return; }
+            
+            closeOrderSummary();
+
+            if(selectedPaymentMethod === 'upi') {
+                showPaymentModal();
+            } else {
+                createOrder('COD');
+            }
+        }
+
+        // --- NEW PAYMENT LOGIC ---
+
+        function showPaymentModal() {
+            const modal = document.getElementById('payment-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            
+            document.getElementById('pay-amount-display').innerText = formatINR(currentTotalToPay);
+
+            // Generate QR Code
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = ''; // Clear previous
+            const upiUrl = `upi://pay?pa=${UPI_ID}&pn=LivestockMart&am=${currentTotalToPay}&cu=INR`;
+            
+            new QRCode(qrContainer, {
+                text: upiUrl,
+                width: 128,
+                height: 128
+            });
+        }
+
+        function closePaymentModal() {
+             document.getElementById('payment-modal').classList.add('hidden');
+             document.getElementById('payment-modal').classList.remove('flex');
+        }
+
+        function payWithApp(app) {
+            // Construct Deep Link
+            // GPay: tez://upi/pay?pa=...
+            // PhonePe: phonepe://pay?pa=...
+            // Paytm: paytmmp://pay?pa=...
+            // General: upi://pay?pa=...
+            
+            const baseParams = `pa=${UPI_ID}&pn=LivestockMart&am=${currentTotalToPay}&cu=INR`;
+            let url = `upi://pay?${baseParams}`;
+
+            if(app === 'gpay') url = `tez://upi/pay?${baseParams}`; 
+            else if(app === 'phonepe') url = `phonepe://pay?${baseParams}`;
+            else if(app === 'paytm') url = `paytmmp://pay?${baseParams}`;
+
+            // Try to open app
+            window.location.href = url;
+
+            // Note: On desktop this won't do much, hence QR code is there.
+        }
+
+        function verifyPayment() {
+            // In a real app, this would check backend status. Here we assume success.
+            closePaymentModal();
+            createOrder('UPI');
+        }
+
+        async function createOrder(method) {
+            const orderData = {
+                items: currentOrderItems.map(i => ({id: i._id, name: i.name, price: i.price, breed: i.breed})),
+                total: currentTotalToPay,
+                status: 'Processing',
+                address: currentAddress,
+                date: new Date().toLocaleDateString(),
+                paymentMethod: method
+            };
+
+            const res = await fetch(`${API_URL}/orders`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(orderData)
+            });
+
+            if(res.ok) {
+                cart = []; // Clear cart
+                saveUserState();
+                updateCartBadge();
+                document.getElementById('success-modal').classList.remove('hidden');
+                document.getElementById('success-modal').classList.add('flex');
+            }
+        }
+
+        function goToOrders() {
+            document.getElementById('success-modal').classList.add('hidden');
+            document.getElementById('success-modal').classList.remove('flex');
+            router('orders');
+            loadData();
+        }
+
+        async function cancelOrder(id) {
+            if(!confirm('Cancel this order?')) return;
+            // FIXED: Backend now correctly compares IDs
+            const res = await fetch(`${API_URL}/orders/${id}`, {
+                method: 'PUT', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({status: 'Cancelled'})
+            });
+            if(res.ok) {
+                showToast('Order Cancelled', 'success');
+                loadData();
+            } else {
+                showToast('Failed to cancel order', 'error');
+            }
+        }
+
+        // --- ADDRESSES ---
+        function openAddressModal() { document.getElementById('address-modal').classList.remove('hidden'); document.getElementById('address-modal').classList.add('flex'); }
+        function closeAddressModal() { document.getElementById('address-modal').classList.add('hidden'); document.getElementById('address-modal').classList.remove('flex'); }
+        
+        function submitAddress(e) {
+            e.preventDefault();
+            const newAddr = {
+                name: document.getElementById('addr-name').value,
+                phone: document.getElementById('addr-phone').value,
+                line1: document.getElementById('addr-line').value,
+                city: document.getElementById('addr-city').value,
+                state: document.getElementById('addr-state').value,
+                pincode: document.getElementById('addr-pincode').value
+            };
+            addresses.push(newAddr);
+            currentAddress = newAddr;
+            saveUserState();
+            closeAddressModal();
+            renderAddresses();
+            
+            // If checking out, re-open summary
+            if(document.getElementById('order-summary-modal').classList.contains('hidden') === false) {
+                 showOrderSummary();
+            } else if (currentOrderItems.length > 0) {
+                 showOrderSummary();
+            }
+        }
+
+        function changeAddress() {
+            closeOrderSummary();
+            openAddressModal();
+        }
+
+        // --- INIT ---
+        document.getElementById('login-form').addEventListener('submit', handleLogin);
+        document.getElementById('register-form').addEventListener('submit', handleRegister);
+        checkAuth();
+        refreshIcons(); // Ensure icons load immediately
+    </script>
 </body>
 </html>
