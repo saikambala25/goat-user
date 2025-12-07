@@ -270,26 +270,32 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
   }
 });
 
-// 6. Update Order Status
+// 6. Update Order Status (e.g., Cancel Order)
 app.put('/api/orders/:id', authMiddleware, async (req, res) => {
   try {
-    // Only allow the user who created the order to update it
+    const { status } = req.body;
+
     const order = await Order.findById(req.params.id);
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
-    
-    if (order.userId !== req.user.id) {
+
+    // Ensure only the owner can update
+    if (order.userId.toString() !== req.user.id) {
       return res.status(403).json({ error: 'Not authorized to update this order' });
     }
-    
-    const updatedOrder = await Order.findByIdAndUpdate(
-      req.params.id,
-      { status: req.body.status },
-      { new: true }
-    );
-    res.json(updatedOrder);
+
+    // Optional: prevent cancelling delivered orders
+    if (status === 'Cancelled' && order.status === 'Delivered') {
+      return res.status(400).json({ error: 'Delivered orders cannot be cancelled' });
+    }
+
+    order.status = status || order.status;
+    await order.save();
+
+    res.json(order);
   } catch (err) {
+    console.error('Update order error:', err);
     res.status(500).json({ error: err.message });
   }
 });
