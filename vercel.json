@@ -6,7 +6,7 @@
       "use": "@vercel/node"
     },
     {
-      "src": "public/**",
+      "src": "index.html",
       "use": "@vercel/static"
     }
   ],
@@ -16,18 +16,12 @@
       "dest": "/server.js"
     },
     {
-        "src": "/admin",
-        "dest": "/public/admin.html"
+      "src": "/",
+      "dest": "/index.html"
     },
     {
       "src": "/(.*)",
-      "dest": "/public/$1",
-      "headers": { "Cache-Control": "max-age=0, s-maxage=86400" }
-    },
-    {
-        "src": "/",
-        "dest": "/public/user.html"
+      "dest": "/index.html"
     }
   ]
 }
-
