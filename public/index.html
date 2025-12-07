@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>LivestockMart</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LivestockMart - User Portal</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
@@ -19,7 +19,6 @@
   </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
-  <!-- AUTH SCREEN -->
   <div id="auth-screen" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-600 via-emerald-500 to-emerald-700 px-4">
     <div class="max-w-5xl w-full grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
       <div class="hidden md:flex flex-col justify-between text-white">
@@ -34,24 +33,23 @@
             Buy goats & sheep<br>with an Amazon-style checkout.
           </h1>
           <p class="text-sm text-emerald-100/80">
-            Secure login, UPI payments to <b>sai.kambala@ybl</b>, card-style checkout, and live order tracking.
+            Secure login, realtime orders, UPI & card payments, and live order tracking – all from one modern dashboard.
           </p>
         </div>
         <div class="flex items-center gap-3 text-xs text-emerald-100/70 mt-8">
           <i data-lucide="shield-check" class="w-4 h-4"></i>
-          <span>Secure authentication • No card/UPI PIN stored on this site</span>
+          <span>Secure authentication • Payments to <b>sai.kambala@ybl</b> via UPI</span>
         </div>
       </div>
 
-      <!-- Auth Card -->
-      <div class="bg-white/95 rounded-3xl p-6 sm:p-8 shadow-2xl border border-white/40">
+      <div id="auth-card" class="bg-white/95 rounded-3xl p-6 sm:p-8 shadow-2xl border border-white/40">
         <div class="flex items-center gap-3 mb-6">
           <div class="w-9 h-9 rounded-full bg-emerald-500/10 flex items-center justify-center">
             <i data-lucide="lock" class="w-4 h-4 text-emerald-500"></i>
           </div>
           <div>
-            <h2 class="text-xl font-semibold text-gray-900">Welcome</h2>
-            <p class="text-xs text-gray-500">Login or create an account</p>
+            <h2 class="text-xl font-semibold text-gray-900">Welcome back</h2>
+            <p class="text-xs text-gray-500">Login or create an account to continue</p>
           </div>
         </div>
 
@@ -60,23 +58,22 @@
           <button id="tab-register" class="flex-1 py-2 rounded-full text-gray-500">Register</button>
         </div>
 
-        <!-- Login -->
         <form id="login-form" class="space-y-4">
           <div>
             <label class="block text-xs font-medium mb-1">Email</label>
-            <input id="login-email" type="email" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            <input id="login-email" type="email" value="user@example.com" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div>
             <label class="block text-xs font-medium mb-1">Password</label>
-            <input id="login-password" type="password" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            <input id="login-password" type="password" value="password" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <p id="auth-error" class="text-xs text-red-500 min-h-[16px]"></p>
           <button type="submit" class="w-full bg-emerald-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-emerald-700 flex items-center justify-center gap-2">
             <span>Login</span>
           </button>
+          <p class="text-[10px] text-center text-gray-400">Demo Mode: Use user@example.com / password</p>
         </form>
 
-        <!-- Register -->
         <form id="register-form" class="space-y-4 hidden">
           <div>
             <label class="block text-xs font-medium mb-1">Full Name</label>
@@ -98,9 +95,7 @@
     </div>
   </div>
 
-  <!-- APP -->
   <div id="user-app" class="hidden min-h-screen flex flex-col">
-    <!-- Header -->
     <header class="bg-white border-b border-gray-200 px-4 md:px-8 py-4 flex items-center justify-between">
       <div class="flex items-center gap-2">
         <div class="w-9 h-9 rounded-full bg-emerald-600 flex items-center justify-center text-white font-bold">L</div>
@@ -110,13 +105,11 @@
         </div>
       </div>
       <div class="flex items-center gap-5">
-        <!-- Cart: icon + badge -->
         <button class="relative flex items-center justify-center" onclick="router('cart')">
           <span class="text-2xl leading-none">🛒</span>
           <span id="header-cart-badge" class="absolute -top-2 -right-3 bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full hidden">0</span>
         </button>
 
-        <!-- Profile -->
         <div class="relative">
           <button onclick="toggleProfileMenu()" class="flex items-center gap-2">
             <div id="profile-avatar" class="w-8 h-8 rounded-full bg-emerald-600 text-white text-xs flex items-center justify-center font-semibold">
@@ -141,7 +134,6 @@
     </header>
 
     <div class="flex flex-1 min-h-0">
-      <!-- Sidebar -->
       <nav class="hidden md:block w-60 bg-white border-r border-gray-100 p-4 space-y-2">
         <button class="nav-item w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100 bg-green-600 text-white" onclick="router('dashboard')">
           <i data-lucide="home" class="w-4 h-4"></i><span>Dashboard</span>
@@ -157,9 +149,7 @@
         </button>
       </nav>
 
-      <!-- Content -->
       <main id="content-area" class="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-50 hide-scrollbar">
-        <!-- Dashboard -->
         <section id="view-dashboard" class="space-y-6">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div class="bg-white p-4 rounded-xl border shadow-sm flex justify-between items-center">
@@ -210,13 +200,11 @@
           </div>
         </section>
 
-        <!-- Browse -->
         <section id="view-browse" class="hidden space-y-4">
           <h2 class="text-lg font-semibold mb-3">Browse Livestock</h2>
           <div id="browse-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
         </section>
 
-        <!-- Cart -->
         <section id="view-cart" class="hidden space-y-4">
           <h2 class="text-lg font-semibold mb-3">Your Cart</h2>
           <div id="cart-list" class="space-y-3"></div>
@@ -228,22 +216,19 @@
           </div>
         </section>
 
-        <!-- Orders -->
         <section id="view-orders" class="hidden space-y-4">
           <h2 class="text-lg font-semibold mb-3">My Orders</h2>
           <div id="orders-list" class="space-y-4"></div>
         </section>
 
-        <!-- Profile -->
         <section id="view-profile" class="hidden space-y-4">
           <h2 class="text-lg font-semibold mb-3">My Profile</h2>
-          <p class="text-sm text-gray-600">Profile details coming soon.</p>
+          <p class="text-sm text-gray-600">Profile details are managed via LocalStorage in this demo.</p>
         </section>
       </main>
     </div>
   </div>
 
-  <!-- Order Summary Modal -->
   <div id="order-summary-modal" class="fixed inset-0 z-30 hidden items-center justify-center bg-black/60">
     <div class="bg-white rounded-2xl p-6 w-full max-w-2xl text-gray-800 shadow-2xl max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between mb-4">
@@ -261,9 +246,7 @@
           </div>
           <div>
             <h4 class="font-semibold mb-2">Delivery address</h4>
-            <div id="order-address" class="bg-gray-50 p-3 rounded-lg text-sm">
-              <p class="text-xs text-gray-500">Address management not wired in this simplified version.</p>
-            </div>
+            <div id="order-address" class="bg-gray-50 p-3 rounded-lg text-sm"></div>
           </div>
         </div>
 
@@ -278,14 +261,14 @@
               <input type="radio" name="payment" value="upi" onchange="selectPayment('upi')" />
               <div>
                 <p class="font-medium">UPI to <span class="font-mono text-emerald-700">sai.kambala@ybl</span></p>
-                <p class="text-xs text-gray-600">Pay using any UPI app (GPay, PhonePe, Paytm...)</p>
+                <p class="text-xs text-gray-600">Pay using any UPI app</p>
               </div>
             </label>
             <label class="flex items-start gap-2 text-sm cursor-pointer">
               <input type="radio" name="payment" value="card" onchange="selectPayment('card')" />
               <div>
                 <p class="font-medium">Credit / Debit Card</p>
-                <p class="text-xs text-gray-600">Processed via your gateway (no card details stored here).</p>
+                <p class="text-xs text-gray-600">Secure payment gateway simulation</p>
               </div>
             </label>
           </div>
@@ -310,7 +293,6 @@
     </div>
   </div>
 
-  <!-- Payment Modal -->
   <div id="payment-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-black/60">
     <div class="bg-white rounded-2xl p-6 w-full max-w-md text-gray-800 shadow-2xl">
       <div class="flex items-center justify-between mb-4">
@@ -320,7 +302,6 @@
         </button>
       </div>
 
-      <!-- UPI Payment -->
       <div id="upi-form" class="hidden space-y-4">
         <div class="bg-gray-50 p-3 rounded-lg text-sm">
           <p class="font-medium text-gray-800">Pay to this UPI ID</p>
@@ -336,39 +317,16 @@
             Use any UPI app and pay this ID. Amount: <span id="upi-amount" class="font-semibold">₹0</span>
           </p>
         </div>
-
-        <div class="space-y-2">
-          <p class="text-xs text-gray-500">Quick launch:</p>
-          <div class="grid grid-cols-2 gap-2">
-            <button type="button" onclick="payWithUpiApp('generic')" class="flex items-center justify-center gap-2 border rounded-lg py-2 text-sm hover:bg-gray-50">
-              Any UPI app
-            </button>
-            <button type="button" onclick="payWithUpiApp('gpay')" class="flex items-center justify-center gap-2 border rounded-lg py-2 text-sm hover:bg-gray-50">
-              Google Pay
-            </button>
-            <button type="button" onclick="payWithUpiApp('phonepe')" class="flex items-center justify-center gap-2 border rounded-lg py-2 text-sm hover:bg-gray-50">
-              PhonePe
-            </button>
-            <button type="button" onclick="payWithUpiApp('paytm')" class="flex items-center justify-center gap-2 border rounded-lg py-2 text-sm hover:bg-gray-50">
-              Paytm
-            </button>
-          </div>
-        </div>
-
         <button type="button" onclick="confirmUpiPaymentDone()" class="w-full bg-green-600 text-white py-2.5 rounded-lg hover:bg-green-700 text-sm font-medium">
           I have completed payment in my UPI app
         </button>
-        <p class="text-[11px] text-gray-400">
-          This site never asks for your UPI PIN. You pay inside your app only.
-        </p>
       </div>
 
-      <!-- Card Payment -->
       <div id="card-form" class="hidden space-y-4">
         <div class="bg-gray-50 p-3 rounded-lg text-sm">
           <p class="font-medium text-gray-800">Credit / Debit Card</p>
           <p class="text-xs text-gray-500 mt-1">
-            Integrate Razorpay / Stripe / any gateway here. This demo only simulates a successful payment – no card data is stored.
+            This demo simulates a successful payment.
           </p>
         </div>
         <button type="button" onclick="startCardGatewayCheckout()" class="w-full bg-green-600 text-white py-2.5 rounded-lg hover:bg-green-700 text-sm font-medium">
@@ -376,7 +334,6 @@
         </button>
       </div>
 
-      <!-- Success -->
       <div id="payment-success" class="hidden text-center py-8">
         <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <i data-lucide="check" class="w-8 h-8 text-green-600"></i>
@@ -392,20 +349,42 @@
     </div>
   </div>
 
-  <!-- Toast -->
   <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 hidden">
     <div id="toast-inner" class="px-4 py-2 rounded-lg text-sm shadow-lg bg-gray-900 text-white"></div>
   </div>
 
   <script>
-    const API_URL = ''; // same origin
+    // --- MOCK DATABASE DATA (Since we have no backend) ---
+    const MOCK_LIVESTOCK = [
+      { _id: 'g1', name: 'Boer Goat', breed: 'Pure Boer', type: 'Goat', age: '14 months', price: 15000, image: '🐐' },
+      { _id: 'g2', name: 'Jamnapari', breed: 'Jamnapari', type: 'Goat', age: '2 years', price: 22000, image: '🐐' },
+      { _id: 's1', name: 'Dumba Sheep', breed: 'Turkish Dumba', type: 'Sheep', age: '10 months', price: 45000, image: '🐑' },
+      { _id: 's2', name: 'Nellore Ram', breed: 'Nellore Jodipi', type: 'Sheep', age: '18 months', price: 18500, image: '🐑' },
+      { _id: 'g3', name: 'Osmanabadi', breed: 'Osmanabadi', type: 'Goat', age: '12 months', price: 12000, image: '🐐' },
+      { _id: 'g4', name: 'Sirohi Kid', breed: 'Sirohi', type: 'Goat', age: '6 months', price: 8500, image: '🐐' },
+    ];
+    
+    // --- LOCAL STORAGE HELPERS ---
+    const LS_KEYS = {
+      USER: 'lm_user',
+      CART: 'lm_cart',
+      ORDERS: 'lm_orders',
+      WISHLIST: 'lm_wishlist'
+    };
+
     let currentUser = null;
-    let livestock = [];
+    let livestock = MOCK_LIVESTOCK;
     let orders = [];
     let cart = [];
     let wishlist = [];
-    let addresses = [];
-    let currentAddress = null;
+    let currentAddress = {
+      name: 'Demo User',
+      phone: '9876543210',
+      line1: 'Hitech City',
+      city: 'Hyderabad',
+      state: 'Telangana',
+      pincode: '500081'
+    }; // Hardcoded for demo
     let currentOrderItems = [];
     let selectedPaymentMethod = null;
     let currentOrderTotal = 0;
@@ -419,25 +398,14 @@
       const toast = document.getElementById('toast');
       const inner = document.getElementById('toast-inner');
       inner.textContent = msg;
-      inner.className =
-        'px-4 py-2 rounded-lg text-sm shadow-lg text-white ' +
-        (type === 'success'
-          ? 'bg-emerald-600'
-          : type === 'error'
-          ? 'bg-red-600'
-          : type === 'warning'
-          ? 'bg-amber-500'
-          : 'bg-gray-900');
+      inner.className = 'px-4 py-2 rounded-lg text-sm shadow-lg text-white ' +
+        (type === 'success' ? 'bg-emerald-600' : type === 'error' ? 'bg-red-600' : type === 'warning' ? 'bg-amber-500' : 'bg-gray-900');
       toast.classList.remove('hidden');
       setTimeout(() => toast.classList.add('hidden'), 2500);
     }
 
     function formatINR(amount) {
-      return new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        maximumFractionDigits: 0,
-      }).format(amount || 0);
+      return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount || 0);
     }
 
     function showAuthError(msg) {
@@ -447,12 +415,7 @@
 
     function getInitials(name) {
       if (!name) return 'U';
-      return name
-        .split(' ')
-        .filter(Boolean)
-        .map((n) => n[0].toUpperCase())
-        .join('')
-        .slice(0, 2);
+      return name.split(' ').filter(Boolean).map((n) => n[0].toUpperCase()).join('').slice(0, 2);
     }
 
     function updateProfileUI() {
@@ -469,150 +432,97 @@
       const menu = document.getElementById('profile-menu');
       if (!menu) return;
       if (typeof force === 'boolean') {
-        if (force) menu.classList.remove('hidden');
-        else menu.classList.add('hidden');
+        if (force) menu.classList.remove('hidden'); else menu.classList.add('hidden');
         return;
       }
       menu.classList.toggle('hidden');
     }
 
-    async function handleLogin(e) {
+    // --- REPLACED FETCH WITH LOCAL LOGIC ---
+
+    function handleLogin(e) {
       e.preventDefault();
-      showAuthError('');
       const email = document.getElementById('login-email').value.trim();
-      const password = document.getElementById('login-password').value.trim();
-      if (!email || !password) return showAuthError('Please enter email and password.');
-
-      try {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ email, password }),
-        });
-        const data = await res.json();
-        if (!res.ok) return showAuthError(data.message || 'Login failed.');
-
-        currentUser = data.user;
-        await loadUserState();
-        updateProfileUI();
-        updateCartBadge();
-        showToast('Logged in', 'success');
-        showApp();
-      } catch (err) {
-        console.error(err);
-        showAuthError('Something went wrong. Please try again.');
-      }
+      if (!email) return showAuthError('Enter email');
+      
+      // Simulate backend login
+      currentUser = { name: 'Demo User', email: email, _id: 'u1' };
+      localStorage.setItem(LS_KEYS.USER, JSON.stringify(currentUser));
+      
+      loadUserState();
+      updateProfileUI();
+      updateCartBadge();
+      showToast('Logged in (Demo Mode)', 'success');
+      showApp();
     }
 
-    async function handleRegister(e) {
+    function handleRegister(e) {
       e.preventDefault();
-      showAuthError('');
       const name = document.getElementById('register-name').value.trim();
       const email = document.getElementById('register-email').value.trim();
-      const password = document.getElementById('register-password').value.trim();
-      if (!name || !email || !password) return showAuthError('All fields are required.');
-
-      try {
-        const res = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ name, email, password }),
-        });
-        const data = await res.json();
-        if (!res.ok) return showAuthError(data.message || 'Registration failed.');
-        currentUser = data.user;
-        await loadUserState();
-        updateProfileUI();
-        updateCartBadge();
-        showToast('Account created', 'success');
-        showApp();
-      } catch (err) {
-        console.error(err);
-        showAuthError('Something went wrong. Please try again.');
-      }
+      
+      currentUser = { name: name || 'User', email: email, _id: 'u' + Date.now() };
+      localStorage.setItem(LS_KEYS.USER, JSON.stringify(currentUser));
+      
+      loadUserState();
+      updateProfileUI();
+      updateCartBadge();
+      showToast('Account created (Demo Mode)', 'success');
+      showApp();
     }
 
-    async function handleLogout() {
-      try {
-        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-      } catch (err) {
-        console.error(err);
-      }
+    function handleLogout() {
+      localStorage.removeItem(LS_KEYS.USER);
       currentUser = null;
       cart = [];
-      wishlist = [];
-      addresses = [];
-      currentAddress = null;
+      orders = [];
       updateCartBadge();
       toggleProfileMenu(false);
       showToast('Logged out', 'info');
       showAuthScreen();
     }
 
-    async function checkAuth() {
-      try {
-        const res = await fetch('/api/auth/me', { credentials: 'include' });
-        if (!res.ok) return showAuthScreen();
-        const data = await res.json();
-        currentUser = data.user;
-        await loadUserState();
+    function checkAuth() {
+      const stored = localStorage.getItem(LS_KEYS.USER);
+      if (stored) {
+        currentUser = JSON.parse(stored);
+        loadUserState();
         updateProfileUI();
         updateCartBadge();
         showApp();
-      } catch (err) {
-        console.error(err);
+      } else {
         showAuthScreen();
       }
     }
 
-    async function loadUserState() {
-      try {
-        const res = await fetch('/api/user/state', { credentials: 'include' });
-        if (!res.ok) return;
-        const data = await res.json();
-        cart = data.cart || [];
-        wishlist = data.wishlist || [];
-        addresses = data.addresses || [];
-        if (!currentAddress && addresses.length > 0) currentAddress = addresses[0];
-      } catch (err) {
-        console.error('state', err);
-      }
+    function loadUserState() {
+      // Load cart and orders from LocalStorage
+      const c = localStorage.getItem(LS_KEYS.CART);
+      cart = c ? JSON.parse(c) : [];
+      
+      const o = localStorage.getItem(LS_KEYS.ORDERS);
+      orders = o ? JSON.parse(o) : [];
     }
 
-    async function saveUserState() {
-      try {
-        await fetch('/api/user/state', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ cart, wishlist, addresses }),
-        });
-      } catch (err) {
-        console.error('save state', err);
-      }
+    function saveUserState() {
+      localStorage.setItem(LS_KEYS.CART, JSON.stringify(cart));
+      localStorage.setItem(LS_KEYS.ORDERS, JSON.stringify(orders));
     }
 
-    async function loadData() {
-      try {
-        const lsRes = await fetch('/api/livestock');
-        livestock = await lsRes.json();
-        const ordRes = await fetch('/api/orders', { credentials: 'include' });
-        orders = await ordRes.json();
-        const activeNav = document.querySelector('.nav-item.bg-green-600');
-        let view = 'dashboard';
-        if (activeNav) {
-          const on = activeNav.getAttribute('onclick') || '';
-          view = on.replace("router('", '').replace("')", '') || 'dashboard';
-        }
-        if (view === 'dashboard') renderDashboard();
-        if (view === 'browse') renderBrowse();
-        if (view === 'orders') renderOrders();
-      } catch (e) {
-        console.error(e);
-        showToast('Failed to load data', 'error');
+    function loadData() {
+      // Mocking the fetch('/api/livestock') call
+      livestock = MOCK_LIVESTOCK; 
+      
+      // Check which view is active
+      const activeNav = document.querySelector('.nav-item.bg-green-600');
+      let view = 'dashboard';
+      if (activeNav) {
+        const on = activeNav.getAttribute('onclick') || '';
+        view = on.replace("router('", '').replace("')", '') || 'dashboard';
       }
+      if (view === 'dashboard') renderDashboard();
+      if (view === 'browse') renderBrowse();
+      if (view === 'orders') renderOrders();
     }
 
     function showApp() {
@@ -774,8 +684,7 @@
       if (!badge) return;
       const count = cart.length;
       badge.textContent = count;
-      if (count > 0) badge.classList.remove('hidden');
-      else badge.classList.add('hidden');
+      if (count > 0) badge.classList.remove('hidden'); else badge.classList.add('hidden');
     }
 
     function addToCart(id) {
@@ -809,7 +718,6 @@
 
     function showOrderSummary() {
       if (!currentOrderItems.length) return showToast('No items in order', 'error');
-
       const modal = document.getElementById('order-summary-modal');
       modal.classList.remove('hidden');
       modal.classList.add('flex');
@@ -837,10 +745,22 @@
         )
         .join('');
 
+      const addrEl = document.getElementById('order-address');
+      if (currentAddress) {
+        addrEl.innerHTML = `
+          <p class="font-semibold">${currentAddress.name}</p>
+          <p>${currentAddress.line1}</p>
+          ${currentAddress.line2 ? `<p>${currentAddress.line2}</p>` : ''}
+          <p>${currentAddress.city}, ${currentAddress.state} - ${currentAddress.pincode}</p>
+          <p>📱 +91 ${currentAddress.phone}</p>
+        `;
+      } else {
+        addrEl.innerHTML = '<p class="text-sm text-gray-500">No address saved.</p>';
+      }
+
       document.getElementById('order-subtotal').textContent = formatINR(subtotal);
       document.getElementById('order-delivery').textContent = delivery === 0 ? 'FREE' : formatINR(delivery);
       document.getElementById('order-total').textContent = formatINR(total);
-
       const upiAmountEl = document.getElementById('upi-amount');
       if (upiAmountEl) upiAmountEl.textContent = formatINR(total);
     }
@@ -865,67 +785,45 @@
       }
     }
 
-    async function createOrder() {
-      try {
-        const items = currentOrderItems.map((i) => ({
-          id: i._id,
-          name: i.name,
-          price: i.price,
-          breed: i.breed,
-          image: i.image,
-        }));
-        const subtotal = currentOrderItems.reduce((s, i) => s + (i.price || 0), 0);
-        const delivery = subtotal > 5000 ? 0 : 200;
-        const total = subtotal + delivery;
+    function createOrder() {
+      // Mocking order creation
+      const items = currentOrderItems.map((i) => ({
+        id: i._id, name: i.name, price: i.price, breed: i.breed, image: i.image,
+      }));
+      const subtotal = currentOrderItems.reduce((s, i) => s + (i.price || 0), 0);
+      const delivery = subtotal > 5000 ? 0 : 200;
+      const total = subtotal + delivery;
 
-        const body = {
-          items,
-          total,
-          status: 'Processing',
-          address: currentAddress
-            ? {
-                name: currentAddress.name,
-                phone: currentAddress.phone,
-                line: currentAddress.line1,
-                city: currentAddress.city,
-                state: currentAddress.state,
-                pincode: currentAddress.pincode,
-              }
-            : null,
-          paymentMethod: selectedPaymentMethod || 'cod',
-        };
+      const newOrder = {
+        _id: 'ord-' + Date.now(),
+        items,
+        total,
+        status: 'Processing',
+        date: new Date().toLocaleDateString(),
+        paymentMethod: selectedPaymentMethod || 'cod',
+        tracking: [
+            { label: 'Order Placed', completed: true },
+            { label: 'Packed', completed: false },
+            { label: 'Shipped', completed: false },
+            { label: 'Delivered', completed: false },
+        ]
+      };
 
-        const res = await fetch('/api/orders', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(body),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          console.error(data);
-          return showToast('Failed to create order', 'error');
-        }
+      orders.unshift(newOrder);
+      currentOrderItems = [];
+      cart = [];
+      saveUserState();
+      renderCart();
+      renderDashboard();
 
-        orders.unshift(data);
-        currentOrderItems = [];
-        cart = [];
-        saveUserState();
-        renderCart();
-        renderDashboard();
-
-        const upiForm = document.getElementById('upi-form');
-        const cardForm = document.getElementById('card-form');
-        const success = document.getElementById('payment-success');
-        if (upiForm) upiForm.classList.add('hidden');
-        if (cardForm) cardForm.classList.add('hidden');
-        if (success) success.classList.remove('hidden');
-        document.getElementById('payment-modal').classList.remove('hidden');
-        document.getElementById('payment-modal').classList.add('flex');
-      } catch (err) {
-        console.error(err);
-        showToast('Error placing order', 'error');
-      }
+      const upiForm = document.getElementById('upi-form');
+      const cardForm = document.getElementById('card-form');
+      const success = document.getElementById('payment-success');
+      if (upiForm) upiForm.classList.add('hidden');
+      if (cardForm) cardForm.classList.add('hidden');
+      if (success) success.classList.remove('hidden');
+      document.getElementById('payment-modal').classList.remove('hidden');
+      document.getElementById('payment-modal').classList.add('flex');
     }
 
     function showPaymentModal(method) {
@@ -963,33 +861,9 @@
     function copyUpiId() {
       const id = 'sai.kambala@ybl';
       if (navigator.clipboard) {
-        navigator.clipboard
-          .writeText(id)
-          .then(() => showToast('UPI ID copied', 'success'))
-          .catch(() => showToast('Unable to copy. Long-press to copy manually.', 'warning'));
+        navigator.clipboard.writeText(id).then(() => showToast('UPI ID copied', 'success'));
       } else {
         showToast('Long-press to copy UPI ID', 'info');
-      }
-    }
-
-    function buildUpiUrl() {
-      const amount = Number(currentOrderTotal || 0);
-      const pa = encodeURIComponent('sai.kambala@ybl');
-      const pn = encodeURIComponent('LivestockMart');
-      const tn = encodeURIComponent('Livestock order');
-      const am = encodeURIComponent(amount.toFixed(2));
-      const cu = 'INR';
-      return `upi://pay?pa=${pa}&pn=${pn}&tn=${tn}&am=${am}&cu=${cu}`;
-    }
-
-    function payWithUpiApp(appType) {
-      const url = buildUpiUrl();
-      try {
-        window.location.href = url;
-        showToast('Opening UPI app...', 'info');
-      } catch (e) {
-        console.error(e);
-        showToast('Could not open UPI app', 'error');
       }
     }
 
@@ -1008,27 +882,14 @@
       router('orders');
     }
 
-    async function cancelOrder(orderId) {
-      try {
-        const res = await fetch(`/api/orders/${orderId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ status: 'Cancelled' }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          console.error(data);
-          return showToast(data.error || 'Failed to cancel order', 'error');
-        }
-        const idx = orders.findIndex((o) => o._id === orderId);
-        if (idx !== -1) orders[idx] = data;
+    function cancelOrder(orderId) {
+      const idx = orders.findIndex((o) => o._id === orderId);
+      if (idx !== -1) {
+        orders[idx].status = 'Cancelled';
+        saveUserState();
         renderOrders();
         renderDashboard();
         showToast('Order cancelled', 'success');
-      } catch (err) {
-        console.error(err);
-        showToast('Error cancelling order', 'error');
       }
     }
 
@@ -1044,51 +905,30 @@
           const itemsArray = Array.isArray(order.items) ? order.items : [];
           const first = itemsArray[0] || {};
           const extra = itemsArray.length > 1 ? ` +${itemsArray.length - 1} more` : '';
-          const paymentBadge =
-            order.paymentMethod === 'upi'
-              ? '<span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Paid via UPI</span>'
-              : order.paymentMethod === 'card'
-              ? '<span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Paid via card</span>'
-              : '<span class="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">Cash on delivery</span>';
+          const paymentBadge = order.paymentMethod === 'upi' ? '<span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Paid via UPI</span>' : order.paymentMethod === 'card' ? '<span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Paid via card</span>' : '<span class="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">Cash on delivery</span>';
 
           let statusBadge = '';
           if (order.status === 'Cancelled') {
             statusBadge = '<span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Cancelled</span>';
-          } else if (order.status === 'Delivered') {
-            statusBadge = '<span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Delivered</span>';
           } else {
             statusBadge = `<span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">${order.status}</span>`;
           }
 
-          const steps = order.tracking || [
-            { label: 'Order Placed', completed: true },
-            { label: 'Packed', completed: false },
-            { label: 'Shipped', completed: false },
-            { label: 'Delivered', completed: false },
-          ];
-
+          const steps = order.tracking || [];
           const trackHtml = `
             <div class="mt-3">
               <div class="flex justify-between text-[11px] text-gray-500 mb-2">
-                ${steps
-                  .map(
-                    (s) => `
+                ${steps.map((s) => `
                   <div class="flex-1 flex flex-col items-center ${s.completed ? 'text-emerald-600' : ''}">
-                    <div class="w-6 h-6 rounded-full flex items-center justify-center border ${
-                      s.completed ? 'bg-emerald-500 text-white border-emerald-500 step-active' : 'bg-white border-gray-300'
-                    }">
+                    <div class="w-6 h-6 rounded-full flex items-center justify-center border ${s.completed ? 'bg-emerald-500 text-white border-emerald-500 step-active' : 'bg-white border-gray-300'}">
                       ${s.completed ? '✓' : ''}
                     </div>
                     <span class="mt-1 text-[10px] text-center">${s.label}</span>
                   </div>
-                `
-                  )
-                  .join('')}
+                `).join('')}
               </div>
               <div class="h-1 w-full bg-gray-200 rounded-full overflow-hidden">
-                <div class="h-full bg-emerald-500 transition-all" style="width:${
-                  (steps.filter((s) => s.completed).length / steps.length) * 100
-                }%"></div>
+                <div class="h-full bg-emerald-500 transition-all" style="width:${(steps.filter((s) => s.completed).length / steps.length) * 100}%"></div>
               </div>
             </div>
           `;
@@ -1105,11 +945,7 @@
                 <div class="flex flex-col items-end gap-1">
                   ${statusBadge}
                   ${paymentBadge}
-                  ${
-                    order.status === 'Processing' || order.status === 'Packed'
-                      ? `<button onclick="cancelOrder('${order._id}')" class="mt-1 text-xs text-red-600 hover:text-red-700">Cancel order</button>`
-                      : ''
-                  }
+                  ${order.status === 'Processing' ? `<button onclick="cancelOrder('${order._id}')" class="mt-1 text-xs text-red-600 hover:text-red-700">Cancel order</button>` : ''}
                 </div>
               </div>
               ${trackHtml}
@@ -1121,10 +957,7 @@
 
     function initApp() {
       document.getElementById('current-date').textContent = new Date().toLocaleString('en-IN', {
-        weekday: 'short',
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
+        weekday: 'short', day: '2-digit', month: 'short', year: 'numeric',
       });
       router('dashboard');
     }
