@@ -1,20 +1,28 @@
-
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const path = require('path');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
+const path = require('path');
 require('dotenv').config();
 
-// Models
+const User = require('./User');
 const Livestock = require('./Livestock');
 const Order = require('./Order');
-const User = require('./User');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret';
+
+// MongoDB connection
+const MONGODB_URI =
+  process.env.MONGODB_URI ||
+  'mongodb://127.0.0.1:27017/livestockmart';
+
+mongoose
+  .connect(MONGODB_URI)
+  .then(() => console.log('✅ MongoDB connected'))
+  .catch((err) => console.error('Mongo error', err));
 
 // Middleware
 app.use(
@@ -25,22 +33,8 @@ app.use(
 );
 app.use(express.json());
 app.use(cookieParser());
-app.use(express.static('public'));
 
-// Database Connection
-const MONGODB_URI =
-  process.env.MONGODB_URI ||
-  'mongodb://localhost:27017/livestockmart';
-
-mongoose
-  .connect(MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
-  .then(() => console.log('✅ Connected to MongoDB'))
-  .catch((err) => console.error('❌ MongoDB Connection Error:', err));
-
-// --- AUTH HELPERS ---
+// --- AUTH HELPER ---
 function createToken(user) {
   return jwt.sign(
     { id: user._id, email: user.email, name: user.name },
@@ -59,7 +53,7 @@ function setAuthCookie(res, token) {
 }
 
 function authMiddleware(req, res, next) {
-  const token = req.cookies && req.cookies.token;
+  const token = req.cookies?.token;
   if (!token) {
     return res.status(401).json({ message: 'Not authenticated' });
   }
@@ -73,7 +67,6 @@ function authMiddleware(req, res, next) {
 }
 
 // --- AUTH ROUTES ---
-// Register
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -103,7 +96,6 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-// Login
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -135,12 +127,10 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Get current user (basic info)
 app.get('/api/auth/me', authMiddleware, (req, res) => {
   res.json({ user: req.user });
 });
 
-// Logout
 app.post('/api/auth/logout', (req, res) => {
   res.clearCookie('token', {
     sameSite: 'lax',
@@ -149,20 +139,20 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ message: 'Logged out' });
 });
 
-// --- USER STATE (cart, wishlist, addresses) ---
-
-// Get saved state
+// --- USER STATE (cart / wishlist / addresses) ---
 app.get('/api/user/state', authMiddleware, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('cart wishlist addresses');
+    const user = await User.findById(req.user.id).select(
+      'cart wishlist addresses'
+    );
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     const populatedCart = await Promise.all(
       (user.cart || []).map(async (item) => {
-        const livestock = await Livestock.findById(item.livestockId);
-        if (!livestock) return null;
+        const ls = await Livestock.findById(item.livestockId);
+        if (!ls) return null;
         return {
-          ...livestock.toObject(),
+          ...ls.toObject(),
           selected: item.selected,
           quantity: item.quantity,
         };
@@ -181,20 +171,17 @@ app.get('/api/user/state', authMiddleware, async (req, res) => {
   }
 });
 
-// Save state
 app.put('/api/user/state', authMiddleware, async (req, res) => {
   try {
     const { cart = [], wishlist = [], addresses = [] } = req.body;
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const cartItems = cart.map((item) => ({
+    user.cart = cart.map((item) => ({
       livestockId: item._id,
       quantity: item.quantity || 1,
       selected: item.selected !== false,
     }));
-
-    user.cart = cartItems;
     user.wishlist = wishlist;
     user.addresses = addresses;
     await user.save();
@@ -209,13 +196,14 @@ app.put('/api/user/state', authMiddleware, async (req, res) => {
 // --- LIVESTOCK ROUTES ---
 app.get('/api/livestock', async (req, res) => {
   try {
-    const livestock = await Livestock.find().sort({ createdAt: -1 });
-    res.json(livestock);
+    const items = await Livestock.find().sort({ createdAt: -1 });
+    res.json(items);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// basic admin add item (you can protect with auth later)
 app.post('/api/livestock', async (req, res) => {
   try {
     const newItem = new Livestock(req.body);
@@ -226,27 +214,19 @@ app.post('/api/livestock', async (req, res) => {
   }
 });
 
-app.delete('/api/livestock/:id', async (req, res) => {
-  try {
-    await Livestock.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Item deleted' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // --- ORDER ROUTES ---
-// Get orders only for current user
+// per-user orders
 app.get('/api/orders', authMiddleware, async (req, res) => {
   try {
-    const orders = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 });
+    const orders = await Order.find({ userId: req.user.id }).sort({
+      createdAt: -1,
+    });
     res.json(orders);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Create order
 app.post('/api/orders', authMiddleware, async (req, res) => {
   try {
     const { items, total, address, paymentMethod } = req.body;
@@ -261,8 +241,8 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
       items,
       total,
       status: 'Processing',
-      address,
       paymentMethod: paymentMethod || 'cod',
+      address: address || null,
       tracking: [
         { label: 'Order Placed', completed: true },
         { label: 'Packed', completed: false },
@@ -274,26 +254,26 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
     await order.save();
     res.status(201).json(order);
   } catch (err) {
+    console.error('Create order error:', err);
     res.status(400).json({ error: err.message });
   }
 });
 
-// Update order status (cancel / progress)
+// CANCEL / UPDATE ORDER (fix)
 app.put('/api/orders/:id', authMiddleware, async (req, res) => {
   try {
     const { status } = req.body;
-
     const order = await Order.findById(req.params.id);
-    if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
-    }
+    if (!order) return res.status(404).json({ error: 'Order not found' });
 
     if (order.userId.toString() !== req.user.id) {
-      return res.status(403).json({ error: 'Not authorized to update this order' });
+      return res.status(403).json({ error: 'Not authorized' });
     }
 
     if (status === 'Cancelled' && order.status === 'Delivered') {
-      return res.status(400).json({ error: 'Delivered orders cannot be cancelled' });
+      return res
+        .status(400)
+        .json({ error: 'Delivered orders cannot be cancelled' });
     }
 
     if (status) {
@@ -306,17 +286,18 @@ app.put('/api/orders/:id', authMiddleware, async (req, res) => {
         Delivered: 3,
         Cancelled: -1,
       };
-
+      const steps = order.tracking || [];
       if (status === 'Cancelled') {
-        order.tracking.forEach((step, i) => {
-          step.completed = i === 0;
+        steps.forEach((s, i) => {
+          s.completed = i === 0;
         });
       } else if (statusIndexMap[status] !== undefined) {
         const idx = statusIndexMap[status];
-        order.tracking.forEach((step, i) => {
-          step.completed = i <= idx;
+        steps.forEach((s, i) => {
+          s.completed = i <= idx;
         });
       }
+      order.tracking = steps;
     }
 
     await order.save();
@@ -327,13 +308,12 @@ app.put('/api/orders/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Serve SPA
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-});
-
+// export app for Vercel
 module.exports = app;
+
+// local dev
+if (require.main === module) {
+  app.listen(PORT, () =>
+    console.log(`🚀 Server running on http://localhost:${PORT}`)
+  );
+}
