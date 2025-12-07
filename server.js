@@ -1,28 +1,19 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const path = require('path');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
-const path = require('path');
 require('dotenv').config();
 
-const User = require('./User');
-const Livestock = require('./Livestock');
-const Order = require('./Order');
+// Models
+const Livestock = require('./models/Livestock');
+const Order = require('./models/Order');
+const User = require('./models/User');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret';
-
-// MongoDB connection
-const MONGODB_URI =
-  process.env.MONGODB_URI ||
-  'mongodb://127.0.0.1:27017/livestockmart';
-
-mongoose
-  .connect(MONGODB_URI)
-  .then(() => console.log('✅ MongoDB connected'))
-  .catch((err) => console.error('Mongo error', err));
 
 // Middleware
 app.use(
@@ -33,8 +24,21 @@ app.use(
 );
 app.use(express.json());
 app.use(cookieParser());
+app.use(express.static('public'));
 
-// --- AUTH HELPER ---
+// Database Connection
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/livestockmart';
+
+mongoose
+  .connect(MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log('✅ Connected to MongoDB'))
+  .catch((err) => console.error('❌ MongoDB Connection Error:', err));
+
+// --- AUTH HELPERS ---
+
 function createToken(user) {
   return jwt.sign(
     { id: user._id, email: user.email, name: user.name },
@@ -53,7 +57,7 @@ function setAuthCookie(res, token) {
 }
 
 function authMiddleware(req, res, next) {
-  const token = req.cookies?.token;
+  const token = req.cookies && req.cookies.token;
   if (!token) {
     return res.status(401).json({ message: 'Not authenticated' });
   }
@@ -67,13 +71,14 @@ function authMiddleware(req, res, next) {
 }
 
 // --- AUTH ROUTES ---
+
+// Register
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
+
     if (!name || !email || !password) {
-      return res
-        .status(400)
-        .json({ message: 'Name, email and password are required' });
+      return res.status(400).json({ message: 'Name, email and password are required' });
     }
 
     const existing = await User.findOne({ email });
@@ -96,13 +101,13 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
+// Login
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+
     if (!email || !password) {
-      return res
-        .status(400)
-        .json({ message: 'Email and password are required' });
+      return res.status(400).json({ message: 'Email and password are required' });
     }
 
     const user = await User.findOne({ email });
@@ -127,10 +132,12 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// Get current user (basic info)
 app.get('/api/auth/me', authMiddleware, (req, res) => {
   res.json({ user: req.user });
 });
 
+// Logout
 app.post('/api/auth/logout', (req, res) => {
   res.clearCookie('token', {
     sameSite: 'lax',
@@ -139,26 +146,30 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ message: 'Logged out' });
 });
 
-// --- USER STATE (cart / wishlist / addresses) ---
+// --- USER STATE (cart, wishlist, addresses) ---
+
+// Get saved state
 app.get('/api/user/state', authMiddleware, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select(
-      'cart wishlist addresses'
-    );
+    const user = await User.findById(req.user.id).select('cart wishlist addresses');
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    // Convert cart items to include livestock details
     const populatedCart = await Promise.all(
       (user.cart || []).map(async (item) => {
-        const ls = await Livestock.findById(item.livestockId);
-        if (!ls) return null;
+        const livestock = await Livestock.findById(item.livestockId);
+        if (!livestock) return null;
+        
         return {
-          ...ls.toObject(),
+          ...livestock.toObject(),
           selected: item.selected,
-          quantity: item.quantity,
+          quantity: item.quantity
         };
       })
     );
-    const validCart = populatedCart.filter((i) => i !== null);
+
+    // Filter out null items
+    const validCart = populatedCart.filter(item => item !== null);
 
     res.json({
       cart: validCart,
@@ -171,17 +182,21 @@ app.get('/api/user/state', authMiddleware, async (req, res) => {
   }
 });
 
+// Save state
 app.put('/api/user/state', authMiddleware, async (req, res) => {
   try {
     const { cart = [], wishlist = [], addresses = [] } = req.body;
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    user.cart = cart.map((item) => ({
+    // Convert cart items back to the format expected by the schema
+    const cartItems = cart.map(item => ({
       livestockId: item._id,
       quantity: item.quantity || 1,
-      selected: item.selected !== false,
+      selected: item.selected !== false
     }));
+
+    user.cart = cartItems;
     user.wishlist = wishlist;
     user.addresses = addresses;
     await user.save();
@@ -193,17 +208,19 @@ app.put('/api/user/state', authMiddleware, async (req, res) => {
   }
 });
 
-// --- LIVESTOCK ROUTES ---
+// --- EXISTING API ROUTES ---
+
+// 1. Get All Livestock
 app.get('/api/livestock', async (req, res) => {
   try {
-    const items = await Livestock.find().sort({ createdAt: -1 });
-    res.json(items);
+    const livestock = await Livestock.find().sort({ createdAt: -1 });
+    res.json(livestock);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// basic admin add item (you can protect with auth later)
+// 2. Add Livestock
 app.post('/api/livestock', async (req, res) => {
   try {
     const newItem = new Livestock(req.body);
@@ -214,106 +231,84 @@ app.post('/api/livestock', async (req, res) => {
   }
 });
 
-// --- ORDER ROUTES ---
-// per-user orders
+// 3. Delete Livestock
+app.delete('/api/livestock/:id', async (req, res) => {
+  try {
+    await Livestock.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Item deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Get Orders (user-specific)
 app.get('/api/orders', authMiddleware, async (req, res) => {
   try {
-    const orders = await Order.find({ userId: req.user.id }).sort({
-      createdAt: -1,
-    });
+    // Only return orders for the current user
+    const orders = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// 5. Create Order
 app.post('/api/orders', authMiddleware, async (req, res) => {
   try {
-    const { items, total, address, paymentMethod } = req.body;
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: 'No items in order' });
-    }
-
-    const order = new Order({
+    // Add the current user to the order
+    const orderData = {
+      ...req.body,
       customer: req.user.name,
-      userId: req.user.id,
-      date: new Date().toLocaleDateString('en-IN'),
-      items,
-      total,
-      status: 'Processing',
-      paymentMethod: paymentMethod || 'cod',
-      address: address || null,
-      tracking: [
-        { label: 'Order Placed', completed: true },
-        { label: 'Packed', completed: false },
-        { label: 'Shipped', completed: false },
-        { label: 'Delivered', completed: false },
-      ],
-    });
-
-    await order.save();
-    res.status(201).json(order);
+      userId: req.user.id
+    };
+    
+    const newOrder = new Order(orderData);
+    await newOrder.save();
+    res.status(201).json(newOrder);
   } catch (err) {
-    console.error('Create order error:', err);
     res.status(400).json({ error: err.message });
   }
 });
 
-// CANCEL / UPDATE ORDER (fix)
+// 6. Update Order Status (Fixed ID Comparison)
 app.put('/api/orders/:id', authMiddleware, async (req, res) => {
   try {
-    const { status } = req.body;
+    // Only allow the user who created the order to update it (e.g., cancel)
     const order = await Order.findById(req.params.id);
-    if (!order) return res.status(404).json({ error: 'Order not found' });
-
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    
+    // FIX: Use .toString() to compare ObjectId with String ID from JWT
     if (order.userId.toString() !== req.user.id) {
-      return res.status(403).json({ error: 'Not authorized' });
+      return res.status(403).json({ error: 'Not authorized to update this order' });
     }
-
-    if (status === 'Cancelled' && order.status === 'Delivered') {
-      return res
-        .status(400)
-        .json({ error: 'Delivered orders cannot be cancelled' });
-    }
-
-    if (status) {
-      order.status = status;
-
-      const statusIndexMap = {
-        Processing: 0,
-        Packed: 1,
-        Shipped: 2,
-        Delivered: 3,
-        Cancelled: -1,
-      };
-      const steps = order.tracking || [];
-      if (status === 'Cancelled') {
-        steps.forEach((s, i) => {
-          s.completed = i === 0;
-        });
-      } else if (statusIndexMap[status] !== undefined) {
-        const idx = statusIndexMap[status];
-        steps.forEach((s, i) => {
-          s.completed = i <= idx;
-        });
-      }
-      order.tracking = steps;
-    }
-
-    await order.save();
-    res.json(order);
+    
+    const updatedOrder = await Order.findByIdAndUpdate(
+      req.params.id,
+      { status: req.body.status },
+      { new: true }
+    );
+    res.json(updatedOrder);
   } catch (err) {
-    console.error('Update order error:', err);
+    console.error("Update Order Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// export app for Vercel
-module.exports = app;
+// Serve Admin Portal
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
 
-// local dev
-if (require.main === module) {
-  app.listen(PORT, () =>
-    console.log(`🚀 Server running on http://localhost:${PORT}`)
-  );
-}
+// Serve User Portal
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'user.html'));
+});
+
+// Start Server
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+});
+
+module.exports = app;
