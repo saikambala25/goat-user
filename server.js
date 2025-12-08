@@ -4,6 +4,8 @@ const cors = require('cors');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
+const Razorpay = require('razorpay');
+const crypto = require('crypto');
 require('dotenv').config();
 
 // Models
@@ -36,6 +38,12 @@ mongoose
   })
   .then(() => console.log('✅ Connected to MongoDB'))
   .catch((err) => console.error('❌ MongoDB Connection Error:', err));
+
+// --- RAZORPAY CONFIGURATION ---
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
 // --- AUTH HELPERS ---
 function createToken(user) {
@@ -195,6 +203,44 @@ app.put('/api/user/state', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('Save user state error:', err);
     res.status(500).json({ message: 'Failed to save user state' });
+  }
+});
+
+// --- PAYMENT ROUTES (Razorpay) ---
+
+// Create Razorpay Order
+app.post('/api/create-razorpay-order', authMiddleware, async (req, res) => {
+  try {
+    const { amount } = req.body;
+    const order = await razorpay.orders.create({
+      amount: Math.round(amount * 100), // Convert to paise
+      currency: 'INR',
+      receipt: `order_${Date.now()}`,
+    });
+    res.json(order);
+  } catch (err) {
+    console.error('Razorpay order error:', err);
+    res.status(500).json({ error: 'Payment setup failed' });
+  }
+});
+
+// Verify Payment (Critical for Security)
+app.post('/api/verify-payment', authMiddleware, (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    
+    const hmac = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET);
+    hmac.update(razorpay_order_id + '|' + razorpay_payment_id);
+    const generated_signature = hmac.digest('hex');
+
+    if (generated_signature === razorpay_signature) {
+      res.json({ success: true });
+    } else {
+      res.status(400).json({ success: false, message: 'Invalid signature' });
+    }
+  } catch (err) {
+    console.error('Payment verification error:', err);
+    res.status(500).json({ error: 'Verification failed' });
   }
 });
 
