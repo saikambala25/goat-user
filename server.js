@@ -38,7 +38,6 @@ mongoose
   .catch((err) => console.error('❌ MongoDB Connection Error:', err));
 
 // --- AUTH HELPERS ---
-
 function createToken(user) {
   return jwt.sign(
     { id: user._id, email: user.email, name: user.name },
@@ -71,12 +70,10 @@ function authMiddleware(req, res, next) {
 }
 
 // --- AUTH ROUTES ---
-
 // Register
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
-
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Name, email and password are required' });
     }
@@ -88,7 +85,6 @@ app.post('/api/auth/register', async (req, res) => {
 
     const user = new User({ name, email, password });
     await user.save();
-
     const token = createToken(user);
     setAuthCookie(res, token);
 
@@ -105,7 +101,6 @@ app.post('/api/auth/register', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
     }
@@ -147,29 +142,25 @@ app.post('/api/auth/logout', (req, res) => {
 });
 
 // --- USER STATE (cart, wishlist, addresses) ---
-
 // Get saved state
 app.get('/api/user/state', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('cart wishlist addresses');
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Convert cart items to include livestock details
     const populatedCart = await Promise.all(
       (user.cart || []).map(async (item) => {
         const livestock = await Livestock.findById(item.livestockId);
         if (!livestock) return null;
-        
         return {
           ...livestock.toObject(),
           selected: item.selected,
-          quantity: item.quantity
+          quantity: item.quantity,
         };
       })
     );
 
-    // Filter out null items
-    const validCart = populatedCart.filter(item => item !== null);
+    const validCart = populatedCart.filter((item) => item !== null);
 
     res.json({
       cart: validCart,
@@ -189,18 +180,17 @@ app.put('/api/user/state', authMiddleware, async (req, res) => {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Convert cart items back to the format expected by the schema
-    const cartItems = cart.map(item => ({
+    const cartItems = cart.map((item) => ({
       livestockId: item._id,
       quantity: item.quantity || 1,
-      selected: item.selected !== false
+      selected: item.selected !== false,
     }));
 
     user.cart = cartItems;
     user.wishlist = wishlist;
     user.addresses = addresses;
-    await user.save();
 
+    await user.save();
     res.json({ success: true });
   } catch (err) {
     console.error('Save user state error:', err);
@@ -208,8 +198,7 @@ app.put('/api/user/state', authMiddleware, async (req, res) => {
   }
 });
 
-// --- EXISTING API ROUTES (unchanged URLs) ---
-
+// --- LIVESTOCK & ORDERS APIs ---
 // 1. Get All Livestock
 app.get('/api/livestock', async (req, res) => {
   try {
@@ -244,8 +233,7 @@ app.delete('/api/livestock/:id', async (req, res) => {
 // 4. Get Orders (user-specific)
 app.get('/api/orders', authMiddleware, async (req, res) => {
   try {
-    // Only return orders for the current user
-    const orders = await Order.find({ customer: req.user.name }).sort({ createdAt: -1 });
+    const orders = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -255,13 +243,11 @@ app.get('/api/orders', authMiddleware, async (req, res) => {
 // 5. Create Order
 app.post('/api/orders', authMiddleware, async (req, res) => {
   try {
-    // Add the current user to the order
     const orderData = {
       ...req.body,
       customer: req.user.name,
-      userId: req.user.id
+      userId: req.user.id,
     };
-    
     const newOrder = new Order(orderData);
     await newOrder.save();
     res.status(201).json(newOrder);
@@ -270,32 +256,24 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
   }
 });
 
-// 6. Update Order Status (e.g., Cancel Order)
+// 6. Update Order Status (cancel, etc.)
 app.put('/api/orders/:id', authMiddleware, async (req, res) => {
   try {
-    const { status } = req.body;
-
     const order = await Order.findById(req.params.id);
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
-
-    // Ensure only the owner can update
-    if (order.userId.toString() !== req.user.id) {
+    if (String(order.userId) !== String(req.user.id)) {
       return res.status(403).json({ error: 'Not authorized to update this order' });
     }
 
-    // Optional: prevent cancelling delivered orders
-    if (status === 'Cancelled' && order.status === 'Delivered') {
-      return res.status(400).json({ error: 'Delivered orders cannot be cancelled' });
-    }
-
-    order.status = status || order.status;
-    await order.save();
-
-    res.json(order);
+    const updatedOrder = await Order.findByIdAndUpdate(
+      req.params.id,
+      { status: req.body.status },
+      { new: true }
+    );
+    res.json(updatedOrder);
   } catch (err) {
-    console.error('Update order error:', err);
     res.status(500).json({ error: err.message });
   }
 });
