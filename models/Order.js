@@ -1,42 +1,42 @@
-const mongoose = require('mongoose');
+// models/Order.js
+const mongoose = require("mongoose");
 
-const orderSchema = new mongoose.Schema({
-  customer: { type: String, required: true },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  date: { type: String, required: true }, // Keeping string for simplicity matching frontend
-  items: [
-    {
-      id: String,
-      name: String,
-      price: Number,
-      breed: String,
+const OrderSchema = new mongoose.Schema(
+  {
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+
+    items: [
+      {
+        _id: false,
+        itemId: { type: mongoose.Schema.Types.ObjectId, ref: "Livestock", required: true },
+        name: String,
+        price: Number,
+        image: String,
+        qty: Number
+      }
+    ],
+
+    totalAmount: { type: Number, required: true },
+
+    paymentMethod: {
+      type: String,
+      enum: ["cod", "upi", "card"],
+      required: true
     },
-  ],
-  total: { type: Number, required: true },
-  status: {
-    type: String,
-    enum: ['Processing', 'Shipped', 'Delivered', 'Cancelled'],
-    default: 'Processing',
-  },
-  paymentMethod: {
-    type: String,
-    enum: ['cod', 'card', 'upi'],
-    default: 'cod',
-  },
-  paymentStatus: {
-    type: String,
-    enum: ['Pending', 'Paid', 'Failed'],
-    default: 'Pending',
-  },
-  address: {
-    name: String,
-    phone: String,
-    line: String,
-    city: String,
-    state: String,
-    pincode: String,
-  },
-  createdAt: { type: Date, default: Date.now },
-});
 
-module.exports = mongoose.model('Order', orderSchema);
+    paymentStatus: {
+      type: String,
+      enum: ["Pending", "Paid", "Failed"],
+      default: "Pending"
+    },
+
+    orderStatus: {
+      type: String,
+      enum: ["Processing", "Shipped", "Delivered", "Cancelled"],
+      default: "Processing"
+    }
+  },
+  { timestamps: true }
+);
+
+module.exports = mongoose.model("Order", OrderSchema);
