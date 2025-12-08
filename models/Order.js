@@ -1,42 +1,28 @@
-// models/Order.js
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 
-const OrderSchema = new mongoose.Schema(
-  {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-
-    items: [
-      {
-        _id: false,
-        itemId: { type: mongoose.Schema.Types.ObjectId, ref: "Livestock", required: true },
+const orderSchema = new mongoose.Schema({
+    customer: { type: String, required: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    date: { type: String, required: true }, // Keeping string for simplicity matching frontend
+    items: [{
+        id: String,
         name: String,
         price: Number,
-        image: String,
-        qty: Number
-      }
-    ],
-
-    totalAmount: { type: Number, required: true },
-
-    paymentMethod: {
-      type: String,
-      enum: ["cod", "upi", "card"],
-      required: true
+        breed: String
+    }],
+    total: { type: Number, required: true },
+    // Added 'Confirmed' for paid orders
+    status: { type: String, default: 'Processing', enum: ['Processing', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled'] }, 
+    paymentMethod: { type: String, default: 'COD' }, // Added payment method field
+    address: {
+        name: String,
+        phone: String,
+        line: String, // Matches the 'line' field passed from frontend's order creation
+        city: String,
+        state: String,
+        pincode: String
     },
+    createdAt: { type: Date, default: Date.now }
+});
 
-    paymentStatus: {
-      type: String,
-      enum: ["Pending", "Paid", "Failed"],
-      default: "Pending"
-    },
-
-    orderStatus: {
-      type: String,
-      enum: ["Processing", "Shipped", "Delivered", "Cancelled"],
-      default: "Processing"
-    }
-  },
-  { timestamps: true }
-);
-
-module.exports = mongoose.model("Order", OrderSchema);
+module.exports = mongoose.model('Order', orderSchema);
