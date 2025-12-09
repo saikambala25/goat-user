@@ -16,17 +16,19 @@
       "dest": "/server.js"
     },
     {
-        "src": "/admin",
-        "dest": "/public/admin.html"
+      "src": "/admin",
+      "dest": "/public/admin.html"
     },
     {
       "src": "/(.*)",
       "dest": "/public/$1",
-      "headers": { "Cache-Control": "max-age=0, s-maxage=86400" }
-    },
-    {
-        "src": "/",
-        "dest": "/public/user.html"
+      "headers": {
+        "Cache-Control": "max-age=0, s-maxage=86400"
+      }
     }
-  ]
+  ],
+  "env": {
+    "MONGODB_URI": "@livestock-mongodb-uri",
+    "JWT_SECRET": "@livestock-jwt-secret"
+  }
 }
