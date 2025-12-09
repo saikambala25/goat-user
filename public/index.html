@@ -834,1468 +834,1485 @@
             </div>
         </main>
     </div>
-
     <script>
-        // --- Base API URL for Vercel same-origin backend ---
-        const API_URL = '/api';
+    // --- Base API URL for Vercel deployment ---
+    const API_URL = 'https://goat-user.vercel.app/api';
 
-        let livestock = [];
-        let orders = [];
+    let livestock = [];
+    let orders = [];
 
-        let cart = [];
-        let wishlist = [];
-        let addresses = [];
-        let currentCategory = 'All';
-        let currentUser = null;
-        let appInitialized = false;
-        let currentAddress = null;
-        let pendingCheckoutItems = null;
-        let editingAddressIndex = -1;
-        let selectedPaymentMethod = null;
-        let currentOrderItems = [];
-        let currentPaymentTab = 'upi';
-        let selectedBank = null;
-        let selectedWallet = null;
+    let cart = [];
+    let wishlist = [];
+    let addresses = [];
+    let currentCategory = 'All';
+    let currentUser = null;
+    let appInitialized = false;
+    let currentAddress = null;
+    let pendingCheckoutItems = null;
+    let editingAddressIndex = -1;
+    let selectedPaymentMethod = null;
+    let currentOrderItems = [];
+    let currentPaymentTab = 'upi';
+    let selectedBank = null;
+    let selectedWallet = null;
 
-        // --- Safely refresh Lucide icons (no crash if CDN blocked) ---
-        function refreshIcons() {
-            try {
-                if (window.lucide && typeof window.lucide.createIcons === 'function') {
-                    window.lucide.createIcons();
-                }
-            } catch (e) {
-                console.warn('Could not refresh Lucide icons:', e);
+    // --- Safely refresh Lucide icons ---
+    function refreshIcons() {
+        try {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons();
             }
+        } catch (e) {
+            console.warn('Could not refresh Lucide icons:', e);
         }
+    }
 
-        // --- Toast popup ---
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toast-container');
-            if (!container) return;
+    // --- Toast popup ---
+    function showToast(message, type = 'info') {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
 
-            const id = 'toast-' + Date.now();
-            const baseClasses = 'pointer-events-auto max-w-xs w-full rounded-xl shadow-lg px-4 py-3 text-sm flex items-start gap-3 transform transition-all duration-200';
-            const types = {
-                success: 'bg-emerald-600 text-white',
-                error: 'bg-red-600 text-white',
-                warning: 'bg-yellow-500 text-black',
-                info: 'bg-gray-800 text-white'
-            };
+        const id = 'toast-' + Date.now();
+        const baseClasses = 'pointer-events-auto max-w-xs w-full rounded-xl shadow-lg px-4 py-3 text-sm flex items-start gap-3 transform transition-all duration-200';
+        const types = {
+            success: 'bg-emerald-600 text-white',
+            error: 'bg-red-600 text-white',
+            warning: 'bg-yellow-500 text-black',
+            info: 'bg-gray-800 text-white'
+        };
+        
+        let iconHtml = '';
+        try {
+            const icon = {
+                success: 'check-circle',
+                error: 'alert-triangle',
+                warning: 'alert-circle',
+                info: 'info'
+            }[type] || 'info';
             
-            // Use fallback icons if lucide is not available
-            let iconHtml = '';
-            try {
-                const icon = {
-                    success: 'check-circle',
-                    error: 'alert-triangle',
-                    warning: 'alert-circle',
-                    info: 'info'
-                }[type] || 'info';
-                
-                if (window.lucide) {
-                    iconHtml = `<i data-lucide="${icon}" class="w-4 h-4"></i>`;
-                } else {
-                    const fallbackIcons = {
-                        success: '✓',
-                        error: '⚠',
-                        warning: '⚠',
-                        info: 'ℹ'
-                    };
-                    iconHtml = `<span class="text-lg">${fallbackIcons[type] || fallbackIcons.info}</span>`;
-                }
-            } catch (e) {
-                iconHtml = `<span class="text-lg">ℹ</span>`;
+            if (window.lucide) {
+                iconHtml = `<i data-lucide="${icon}" class="w-4 h-4"></i>`;
+            } else {
+                const fallbackIcons = {
+                    success: '✓',
+                    error: '⚠',
+                    warning: '⚠',
+                    info: 'ℹ'
+                };
+                iconHtml = `<span class="text-lg">${fallbackIcons[type] || fallbackIcons.info}</span>`;
             }
-
-            const div = document.createElement('div');
-            div.id = id;
-            div.className = baseClasses + ' ' + (types[type] || types.info);
-
-            div.innerHTML = `
-                <div class="mt-0.5">
-                    ${iconHtml}
-                </div>
-                <div class="flex-1">${message}</div>
-                <button onclick="document.getElementById('${id}')?.remove()" class="ml-2 text-xs opacity-80 hover:opacity-100">
-                    ✕
-                </button>
-            `;
-
-            container.appendChild(div);
-            refreshIcons();
-
-            setTimeout(() => {
-                div.classList.add('opacity-0', 'translate-x-2');
-                setTimeout(() => div.remove(), 150);
-            }, 3000);
+        } catch (e) {
+            iconHtml = `<span class="text-lg">ℹ</span>`;
         }
 
-        // --- Helpers for INR formatting ---
+        const div = document.createElement('div');
+        div.id = id;
+        div.className = baseClasses + ' ' + (types[type] || types.info);
 
-        function formatINR(value) {
-            const num = Number(value) || 0;
-            return '₹' + num.toLocaleString('en-IN');
-        }
+        div.innerHTML = `
+            <div class="mt-0.5">
+                ${iconHtml}
+            </div>
+            <div class="flex-1">${message}</div>
+            <button onclick="document.getElementById('${id}')?.remove()" class="ml-2 text-xs opacity-80 hover:opacity-100">
+                ✕
+            </button>
+        `;
 
-        // --- USER STATE MANAGEMENT (MongoDB) ---
+        container.appendChild(div);
+        refreshIcons();
 
-        async function loadUserState() {
-            if (!currentUser || !currentUser.id) return;
-            try {
-                const response = await fetch(`${API_URL}/user/state`, {
-                    method: 'GET',
-                    credentials: 'include'
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    cart = data.cart || [];
-                    wishlist = data.wishlist || [];
-                    addresses = data.addresses || [];
-                    
-                    // If there are addresses, set the first one as current
-                    if (addresses.length > 0) {
-                        currentAddress = addresses[0];
-                    }
-                } else {
-                    cart = [];
-                    wishlist = [];
-                    addresses = [];
-                    currentAddress = null;
+        setTimeout(() => {
+            div.classList.add('opacity-0', 'translate-x-2');
+            setTimeout(() => div.remove(), 150);
+        }, 3000);
+    }
+
+    // --- Helpers for INR formatting ---
+    function formatINR(value) {
+        const num = Number(value) || 0;
+        return '₹' + num.toLocaleString('en-IN');
+    }
+
+    // --- USER STATE MANAGEMENT (MongoDB) ---
+    async function loadUserState() {
+        if (!currentUser || !currentUser.id) return;
+        try {
+            const response = await fetch(`${API_URL}/user/state`, {
+                method: 'GET',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json'
                 }
-            } catch (e) {
-                console.error('Error loading user state:', e);
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                cart = data.cart || [];
+                wishlist = data.wishlist || [];
+                addresses = data.addresses || [];
+                
+                if (addresses.length > 0) {
+                    currentAddress = addresses[0];
+                }
+            } else {
+                console.error('Failed to load user state:', await response.text());
                 cart = [];
                 wishlist = [];
                 addresses = [];
                 currentAddress = null;
             }
-        }
-
-        async function saveUserState() {
-            if (!currentUser || !currentUser.id) return;
-            try {
-                const response = await fetch(`${API_URL}/user/state`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ cart, wishlist, addresses })
-                });
-                
-                if (!response.ok) {
-                    console.error('Failed to save user state');
-                }
-            } catch (e) {
-                console.error('Error saving user state:', e);
-            }
-        }
-
-        // --- AUTH UI HELPERS ---
-
-        function switchAuthView(mode) {
-            const card = document.getElementById('auth-card');
-            if (!card) return;
-            if (mode === 'register') {
-                card.classList.add('show-register');
-            } else {
-                card.classList.remove('show-register');
-            }
-        }
-
-        function showAuthError(message) {
-            const el = document.getElementById('auth-error');
-            if (!el) return;
-            if (message) {
-                el.textContent = message;
-                el.classList.remove('hidden');
-                showToast(message, 'error');
-            } else {
-                el.textContent = '';
-                el.classList.add('hidden');
-            }
-        }
-
-        function showAuthScreen() {
-            const auth = document.getElementById('auth-screen');
-            const app = document.getElementById('user-app');
-            if (auth) auth.classList.remove('hidden');
-            if (app) app.classList.add('hidden');
-        }
-
-        function showApp() {
-            const auth = document.getElementById('auth-screen');
-            const app = document.getElementById('user-app');
-            if (auth) auth.classList.add('hidden');
-            if (app) app.classList.remove('hidden');
-
-            if (!appInitialized) {
-                initApp();
-            }
-        }
-
-        function getInitials(name) {
-            if (!name) return 'U';
-            return name
-                .split(' ')
-                .filter(Boolean)
-                .map(n => n[0].toUpperCase())
-                .join('')
-                .slice(0, 2);
-        }
-
-        function updateProfileUI() {
-            const avatar = document.getElementById('profile-avatar');
-            const nameEl = document.getElementById('profile-name');
-            const metaEl = document.getElementById('profile-meta');
-            const profileNameInput = document.getElementById('profile-name-input');
-            const profileEmailInput = document.getElementById('profile-email-input');
-
-            const name = currentUser?.name || 'User';
-            const email = currentUser?.email || '';
-
-            if (avatar) avatar.textContent = getInitials(name);
-            if (nameEl) nameEl.textContent = name;
-            if (metaEl) metaEl.textContent = 'Welcome back';
-            if (profileNameInput) profileNameInput.value = name;
-            if (profileEmailInput) profileEmailInput.value = email;
-        }
-
-        function toggleProfileMenu(force) {
-            const menu = document.getElementById('profile-menu');
-            if (!menu) return;
-            if (typeof force === 'boolean') {
-                if (force) menu.classList.remove('hidden');
-                else menu.classList.add('hidden');
-                return;
-            }
-            menu.classList.toggle('hidden');
-        }
-
-        async function handleLogin(event) {
-            event.preventDefault();
-            showAuthError('');
-
-            const email = document.getElementById('login-email').value.trim();
-            const password = document.getElementById('login-password').value.trim();
-
-            if (!email || !password) {
-                showAuthError('Please enter email and password.');
-                return;
-            }
-
-            try {
-                const res = await fetch(`${API_URL}/auth/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ email, password })
-                });
-
-                const data = await res.json();
-                if (!res.ok) {
-                    showAuthError(data.message || 'Login failed.');
-                    return;
-                }
-
-                currentUser = data.user;
-                await loadUserState();
-                updateProfileUI();
-                updateCartBadge();
-                updateWishlistBadge();
-                showToast('Logged in successfully', 'success');
-                showApp();
-            } catch (err) {
-                console.error('Login error', err);
-                showAuthError('Something went wrong. Please try again.');
-            }
-        }
-
-        async function handleRegister(event) {
-            event.preventDefault();
-            showAuthError('');
-
-            const name = document.getElementById('register-name').value.trim();
-            const email = document.getElementById('register-email').value.trim();
-            const password = document.getElementById('register-password').value.trim();
-
-            if (!name || !email || !password) {
-                showAuthError('All fields are required to register.');
-                return;
-            }
-
-            try {
-                const res = await fetch(`${API_URL}/auth/register`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ name, email, password })
-                });
-
-                const data = await res.json();
-                if (!res.ok) {
-                    showAuthError(data.message || 'Registration failed.');
-                    return;
-                }
-
-                currentUser = data.user;
-                await loadUserState();
-                updateProfileUI();
-                updateCartBadge();
-                updateWishlistBadge();
-                showToast('Account created & logged in', 'success');
-                showApp();
-            } catch (err) {
-                console.error('Register error', err);
-                showAuthError('Something went wrong. Please try again.');
-            }
-        }
-
-        async function handleLogout() {
-            try {
-                await fetch(`${API_URL}/auth/logout`, {
-                    method: 'POST',
-                    credentials: 'include'
-                });
-            } catch (err) {
-                console.error('Logout error', err);
-            }
-
-            currentUser = null;
+        } catch (e) {
+            console.error('Error loading user state:', e);
             cart = [];
             wishlist = [];
             addresses = [];
             currentAddress = null;
+        }
+    }
+
+    async function saveUserState() {
+        if (!currentUser || !currentUser.id) return;
+        try {
+            const response = await fetch(`${API_URL}/user/state`, {
+                method: 'PUT',
+                headers: { 
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify({ cart, wishlist, addresses })
+            });
+            
+            if (!response.ok) {
+                console.error('Failed to save user state:', await response.text());
+            }
+        } catch (e) {
+            console.error('Error saving user state:', e);
+        }
+    }
+
+    // --- AUTH UI HELPERS ---
+    function switchAuthView(mode) {
+        const card = document.getElementById('auth-card');
+        if (!card) return;
+        if (mode === 'register') {
+            card.classList.add('show-register');
+        } else {
+            card.classList.remove('show-register');
+        }
+    }
+
+    function showAuthError(message) {
+        const el = document.getElementById('auth-error');
+        if (!el) return;
+        if (message) {
+            el.textContent = message;
+            el.classList.remove('hidden');
+            showToast(message, 'error');
+        } else {
+            el.textContent = '';
+            el.classList.add('hidden');
+        }
+    }
+
+    function showAuthScreen() {
+        const auth = document.getElementById('auth-screen');
+        const app = document.getElementById('user-app');
+        if (auth) auth.classList.remove('hidden');
+        if (app) app.classList.add('hidden');
+    }
+
+    function showApp() {
+        const auth = document.getElementById('auth-screen');
+        const app = document.getElementById('user-app');
+        if (auth) auth.classList.add('hidden');
+        if (app) app.classList.remove('hidden');
+
+        if (!appInitialized) {
+            initApp();
+        }
+    }
+
+    function getInitials(name) {
+        if (!name) return 'U';
+        return name
+            .split(' ')
+            .filter(Boolean)
+            .map(n => n[0].toUpperCase())
+            .join('')
+            .slice(0, 2);
+    }
+
+    function updateProfileUI() {
+        const avatar = document.getElementById('profile-avatar');
+        const nameEl = document.getElementById('profile-name');
+        const metaEl = document.getElementById('profile-meta');
+        const profileNameInput = document.getElementById('profile-name-input');
+        const profileEmailInput = document.getElementById('profile-email-input');
+
+        const name = currentUser?.name || 'User';
+        const email = currentUser?.email || '';
+
+        if (avatar) avatar.textContent = getInitials(name);
+        if (nameEl) nameEl.textContent = name;
+        if (metaEl) metaEl.textContent = 'Welcome back';
+        if (profileNameInput) profileNameInput.value = name;
+        if (profileEmailInput) profileEmailInput.value = email;
+    }
+
+    function toggleProfileMenu(force) {
+        const menu = document.getElementById('profile-menu');
+        if (!menu) return;
+        if (typeof force === 'boolean') {
+            if (force) menu.classList.remove('hidden');
+            else menu.classList.add('hidden');
+            return;
+        }
+        menu.classList.toggle('hidden');
+    }
+
+    async function handleLogin(event) {
+        event.preventDefault();
+        showAuthError('');
+
+        const email = document.getElementById('login-email').value.trim();
+        const password = document.getElementById('login-password').value.trim();
+
+        if (!email || !password) {
+            showAuthError('Please enter email and password.');
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API_URL}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ email, password })
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                showAuthError(data.message || 'Login failed.');
+                return;
+            }
+
+            currentUser = data.user;
+            await loadUserState();
+            updateProfileUI();
             updateCartBadge();
             updateWishlistBadge();
+            showToast('Logged in successfully', 'success');
+            showApp();
+        } catch (err) {
+            console.error('Login error', err);
+            showAuthError('Something went wrong. Please try again.');
+        }
+    }
 
-            toggleProfileMenu(false);
-            showToast('Logged out', 'info');
-            showAuthScreen();
+    async function handleRegister(event) {
+        event.preventDefault();
+        showAuthError('');
+
+        const name = document.getElementById('register-name').value.trim();
+        const email = document.getElementById('register-email').value.trim();
+        const password = document.getElementById('register-password').value.trim();
+
+        if (!name || !email || !password) {
+            showAuthError('All fields are required to register.');
+            return;
         }
 
-        async function checkAuth() {
-            try {
-                const res = await fetch(`${API_URL}/auth/me`, {
-                    method: 'GET',
-                    credentials: 'include'
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    currentUser = data.user;
-                    await loadUserState();
-                    updateProfileUI();
-                    updateCartBadge();
-                    updateWishlistBadge();
-                    showApp();
-                } else {
-                    showAuthScreen();
-                }
-            } catch (err) {
-                console.error('Auth check error', err);
+        try {
+            const res = await fetch(`${API_URL}/auth/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ name, email, password })
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                showAuthError(data.message || 'Registration failed.');
+                return;
+            }
+
+            currentUser = data.user;
+            await loadUserState();
+            updateProfileUI();
+            updateCartBadge();
+            updateWishlistBadge();
+            showToast('Account created & logged in', 'success');
+            showApp();
+        } catch (err) {
+            console.error('Register error', err);
+            showAuthError('Something went wrong. Please try again.');
+        }
+    }
+
+    async function handleLogout() {
+        try {
+            await fetch(`${API_URL}/auth/logout`, {
+                method: 'POST',
+                credentials: 'include'
+            });
+        } catch (err) {
+            console.error('Logout error', err);
+        }
+
+        currentUser = null;
+        cart = [];
+        wishlist = [];
+        addresses = [];
+        currentAddress = null;
+        updateCartBadge();
+        updateWishlistBadge();
+
+        toggleProfileMenu(false);
+        showToast('Logged out', 'info');
+        showAuthScreen();
+    }
+
+    async function checkAuth() {
+        try {
+            const res = await fetch(`${API_URL}/auth/me`, {
+                method: 'GET',
+                credentials: 'include'
+            });
+            if (res.ok) {
+                const data = await res.json();
+                currentUser = data.user;
+                await loadUserState();
+                updateProfileUI();
+                updateCartBadge();
+                updateWishlistBadge();
+                showApp();
+            } else {
                 showAuthScreen();
             }
+        } catch (err) {
+            console.error('Auth check error', err);
+            showAuthScreen();
         }
+    }
 
-        // --- DATA LOADING (per-user data from backend) ---
-        async function loadData() {
-            try {
-                const lsRes = await fetch(`${API_URL}/livestock`);
+    // --- DATA LOADING (per-user data from backend) ---
+    async function loadData() {
+        try {
+            // Load livestock
+            const lsRes = await fetch(`${API_URL}/livestock`);
+            if (lsRes.ok) {
                 livestock = await lsRes.json();
+            } else {
+                console.error('Failed to load livestock:', await lsRes.text());
+                livestock = [];
+            }
 
-                // Only load orders for current logged-in user (backend must filter by user)
+            // Load orders for current user
+            if (currentUser) {
                 const ordRes = await fetch(`${API_URL}/orders`, {
                     method: 'GET',
                     credentials: 'include'
                 });
-                orders = await ordRes.json();
-
-                const activeNav = document.querySelector('.nav-item.bg-green-600');
-                let currentView = 'dashboard';
-                if (activeNav) {
-                    const onclick = activeNav.getAttribute('onclick') || "";
-                    currentView = onclick.replace("router('", "").replace("')", "") || 'dashboard';
-                }
-
-                if (currentView === 'dashboard') renderDashboard();
-                if (currentView === 'browse') renderBrowse();
-                if (currentView === 'orders') renderOrders();
-            } catch (e) {
-                console.error("API Error", e);
-                showToast('Failed to load data from server', 'error');
-            }
-        }
-
-        // --- ROUTING ---
-
-        function router(viewName) {
-            loadData();
-
-            const titles = {
-                'dashboard': 'My Dashboard', 'browse': 'Browse Livestock', 'cart': 'Shopping Cart',
-                'orders': 'My Orders', 'wishlist': 'My Wishlist', 'addresses': 'Addresses',
-                'profile': 'My Profile', 'support': 'Support'
-            };
-            document.getElementById('page-title').innerText = titles[viewName] || 'Dashboard';
-
-            const views = ['dashboard', 'browse', 'cart', 'orders', 'wishlist', 'addresses', 'profile', 'support'];
-            views.forEach(v => document.getElementById(`view-${v}`)?.classList.add('hidden'));
-
-            const activeView = document.getElementById(`view-${viewName}`);
-            if (activeView) activeView.classList.remove('hidden');
-
-            document.querySelectorAll('.nav-item').forEach(btn => {
-                if (btn.getAttribute('onclick').includes(viewName)) {
-                    btn.classList.add('bg-green-600', 'text-white');
-                    btn.classList.remove('text-gray-600', 'hover:bg-gray-100');
+                if (ordRes.ok) {
+                    orders = await ordRes.json();
                 } else {
-                    btn.classList.remove('bg-green-600', 'text-white');
-                    btn.classList.add('text-gray-600', 'hover:bg-gray-100');
+                    console.error('Failed to load orders:', await ordRes.text());
+                    orders = [];
                 }
-            });
-
-            if (viewName === 'dashboard') renderDashboard();
-            if (viewName === 'browse') renderBrowse();
-            if (viewName === 'cart') renderCart();
-            if (viewName === 'orders') renderOrders();
-            if (viewName === 'wishlist') renderWishlist();
-            if (viewName === 'addresses') renderAddresses();
-
-            refreshIcons();
-        }
-
-        // --- RENDER FUNCTIONS ---
-
-        function renderDashboard() {
-            // Make sure orders is always an array
-            const safeOrders = Array.isArray(orders) ? orders.filter(o => o && Array.isArray(o.items)) : [];
-
-            const totalSpent = safeOrders.reduce((sum, order) => {
-                const total = Number(order?.total) || 0;
-                return sum + total;
-            }, 0);
-
-            document.getElementById('dash-total-spent').innerText = formatINR(totalSpent);
-            document.getElementById('dash-total-orders').innerText = safeOrders.length;
-            document.getElementById('dash-total-wishlist').innerText = wishlist.length;
-            document.getElementById('dash-total-cart').innerText = cart.length;
-            document.getElementById('dash-total-livestock').innerText = livestock.length;
-
-            const recentContainer = document.getElementById('dash-recent-orders');
-
-            if (safeOrders.length === 0) {
-                recentContainer.innerHTML = '<p class="text-gray-500 text-sm">No orders yet.</p>';
-                return;
             }
 
-            const recent = safeOrders.slice(0, 3);
-
-            recentContainer.innerHTML = recent.map(o => {
-                const itemsArray = Array.isArray(o.items) ? o.items : [];
-                const firstItem = itemsArray[0] || {};
-                const title = firstItem.name || 'Livestock order';
-                const extraCount = itemsArray.length > 1 ? itemsArray.length - 1 : 0;
-                const extraLabel = extraCount > 0 ? `+${extraCount} more` : '';
-
-                const orderId = o._id ? String(o._id).slice(-6) : '------';
-                const date = o.date || '';
-                const total = formatINR(o.total || 0);
-                const status = o.status || 'Processing';
-
-                return `
-                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                        <div class="flex items-center gap-4">
-                            <div class="w-12 h-12 bg-white rounded flex items-center justify-center text-2xl">📦</div>
-                            <div>
-                                <p class="font-bold text-gray-800">${title} ${extraLabel}</p>
-                                <p class="text-xs text-gray-500">#${orderId} • ${date}</p>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <p class="font-bold">${total}</p>
-                            <span class="text-xs px-2 py-1 ${getStatusColor(status)} rounded-full font-medium">${status}</span>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function filterCategory(cat) {
-            currentCategory = cat;
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                if (btn.innerText === cat || (cat === 'All' && btn.innerText === 'All')) {
-                    btn.classList.add('bg-gray-800', 'text-white');
-                    btn.classList.remove('bg-white', 'text-gray-600', 'border');
-                } else {
-                    btn.classList.remove('bg-gray-800', 'text-white');
-                    btn.classList.add('bg-white', 'text-gray-600', 'border');
-                }
-            });
-            renderBrowse();
-        }
-
-        function renderBrowse() {
-            const searchInput = document.getElementById('search-input');
-            if (!searchInput) return;
-
-            const searchTerm = searchInput.value.toLowerCase();
-            const grid = document.getElementById('livestock-grid');
-            
-            const filtered = livestock.filter(item => {
-                const matchSearch = item.name.toLowerCase().includes(searchTerm) || item.breed.toLowerCase().includes(searchTerm);
-                const matchCat = currentCategory === 'All' || item.type === currentCategory;
-                return matchSearch && matchCat;
-            });
-
-            if (filtered.length === 0) {
-                grid.innerHTML = '<div class="col-span-3 text-center text-gray-500 py-10">No livestock found matching your criteria.</div>';
-                return;
+            const activeNav = document.querySelector('.nav-item.bg-green-600');
+            let currentView = 'dashboard';
+            if (activeNav) {
+                const onclick = activeNav.getAttribute('onclick') || "";
+                currentView = onclick.replace("router('", "").replace("')", "") || 'dashboard';
             }
 
-            grid.innerHTML = filtered.map(item => {
-                const inWishlist = wishlist.includes(item._id);
-                return `
-                <div class="bg-white p-4 rounded-xl border border-gray-200 hover:shadow-lg transition-shadow">
-                    <div class="h-40 bg-gray-100 rounded-lg flex items-center justify-center text-6xl mb-4 relative">
-                        ${item.image}
-                        <button onclick="toggleWishlist('${item._id}')" class="absolute top-2 right-2 p-2 bg-white rounded-full shadow-sm hover:text-red-500 ${inWishlist ? 'text-red-500' : 'text-gray-400'}">
-                            <i data-lucide="heart" class="w-4 h-4 ${inWishlist ? 'fill-current' : ''}"></i>
-                        </button>
-                    </div>
-                    <div class="flex justify-between items-start mb-2">
-                        <div>
-                            <h3 class="font-bold text-lg text-gray-800">${item.name}</h3>
-                            <p class="text-xs text-gray-500">${item.breed} • ${item.age}</p>
-                        </div>
-                        <span class="bg-gray-800 text-white text-xs px-2 py-1 rounded">${item.tags?.[0] || 'Good'}</span>
-                    </div>
-                    <div class="flex items-center justify-between mt-4">
-                        <span class="text-xl font-bold text-green-700">${formatINR(item.price)}</span>
-                        <div class="flex gap-2">
-                            <button onclick="buyNow('${item._id}')" class="bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700 transition">Buy Now</button>
-                            <button onclick="addToCart('${item._id}')" class="bg-gray-900 text-white px-3 py-2 rounded-lg text-sm hover:bg-gray-800 transition">Add to Cart</button>
-                        </div>
-                    </div>
-                </div>
-            `}).join('');
-            refreshIcons();
+            if (currentView === 'dashboard') renderDashboard();
+            if (currentView === 'browse') renderBrowse();
+            if (currentView === 'orders') renderOrders();
+        } catch (e) {
+            console.error("API Error", e);
+            showToast('Failed to load data from server', 'error');
+        }
+    }
+
+    // --- ROUTING ---
+    function router(viewName) {
+        loadData();
+
+        const titles = {
+            'dashboard': 'My Dashboard', 'browse': 'Browse Livestock', 'cart': 'Shopping Cart',
+            'orders': 'My Orders', 'wishlist': 'My Wishlist', 'addresses': 'Addresses',
+            'profile': 'My Profile', 'support': 'Support'
+        };
+        document.getElementById('page-title').innerText = titles[viewName] || 'Dashboard';
+
+        const views = ['dashboard', 'browse', 'cart', 'orders', 'wishlist', 'addresses', 'profile', 'support'];
+        views.forEach(v => document.getElementById(`view-${v}`)?.classList.add('hidden'));
+
+        const activeView = document.getElementById(`view-${viewName}`);
+        if (activeView) activeView.classList.remove('hidden');
+
+        document.querySelectorAll('.nav-item').forEach(btn => {
+            if (btn.getAttribute('onclick').includes(viewName)) {
+                btn.classList.add('bg-green-600', 'text-white');
+                btn.classList.remove('text-gray-600', 'hover:bg-gray-100');
+            } else {
+                btn.classList.remove('bg-green-600', 'text-white');
+                btn.classList.add('text-gray-600', 'hover:bg-gray-100');
+            }
+        });
+
+        if (viewName === 'dashboard') renderDashboard();
+        if (viewName === 'browse') renderBrowse();
+        if (viewName === 'cart') renderCart();
+        if (viewName === 'orders') renderOrders();
+        if (viewName === 'wishlist') renderWishlist();
+        if (viewName === 'addresses') renderAddresses();
+
+        refreshIcons();
+    }
+
+    // --- RENDER FUNCTIONS ---
+    function renderDashboard() {
+        const safeOrders = Array.isArray(orders) ? orders.filter(o => o && Array.isArray(o.items)) : [];
+        const totalSpent = safeOrders.reduce((sum, order) => sum + (Number(order?.total) || 0), 0);
+
+        document.getElementById('dash-total-spent').innerText = formatINR(totalSpent);
+        document.getElementById('dash-total-orders').innerText = safeOrders.length;
+        document.getElementById('dash-total-wishlist').innerText = wishlist.length;
+        document.getElementById('dash-total-cart').innerText = cart.length;
+        document.getElementById('dash-total-livestock').innerText = livestock.length;
+
+        const recentContainer = document.getElementById('dash-recent-orders');
+        if (safeOrders.length === 0) {
+            recentContainer.innerHTML = '<p class="text-gray-500 text-sm">No orders yet.</p>';
+            return;
         }
 
-        function renderCart() {
-            const container = document.getElementById('cart-items-container');
-            const totalEl = document.getElementById('cart-total');
-            const titleEl = document.getElementById('cart-count-title');
-            
-            if (cart.length === 0) {
-                container.innerHTML = '<div class="text-center py-10 text-gray-400">Your cart is empty.</div>';
-                totalEl.innerText = '0';
-                titleEl.innerText = '(0 items)';
-                return;
-            }
+        const recent = safeOrders.slice(0, 3);
+        recentContainer.innerHTML = recent.map(o => {
+            const itemsArray = Array.isArray(o.items) ? o.items : [];
+            const firstItem = itemsArray[0] || {};
+            const title = firstItem.name || 'Livestock order';
+            const extraCount = itemsArray.length > 1 ? itemsArray.length - 1 : 0;
+            const extraLabel = extraCount > 0 ? `+${extraCount} more` : '';
 
-            let total = 0;
-            const selectedItems = cart.filter(item => item.selected !== false);
-            total = selectedItems.reduce((sum, item) => sum + (item.price || 0), 0);
+            const orderId = o._id ? String(o._id).slice(-6) : '------';
+            const date = o.date || '';
+            const total = formatINR(o.total || 0);
+            const status = o.status || 'Processing';
 
-            container.innerHTML = cart.map((item, index) => {
-                const isSelected = item.selected !== false;
-                return `
+            return `
                 <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                     <div class="flex items-center gap-4">
-                        <input type="checkbox" class="w-4 h-4 mt-1" ${isSelected ? 'checked' : ''} onchange="toggleCartSelection(${index}, this.checked)">
-                        <div class="w-16 h-16 bg-white rounded-lg flex items-center justify-center text-3xl border border-gray-200">${item.image}</div>
+                        <div class="w-12 h-12 bg-white rounded flex items-center justify-center text-2xl">📦</div>
                         <div>
-                            <h4 class="font-bold text-gray-800">${item.name}</h4>
-                            <p class="text-sm text-gray-500">Breed: ${item.breed}</p>
+                            <p class="font-bold text-gray-800">${title} ${extraLabel}</p>
+                            <p class="text-xs text-gray-500">#${orderId} • ${date}</p>
                         </div>
                     </div>
-                    <div class="flex items-center gap-6">
-                        <p class="font-bold text-lg w-24 text-right">${formatINR(item.price)}</p>
-                        <button onclick="removeFromCart(${index})" class="text-red-500 hover:bg-red-50 p-2 rounded-full">
-                            <i data-lucide="trash-2" class="w-5 h-5"></i>
-                        </button>
-                    </div>
-                </div>
-                `;
-            }).join('');
-            
-            totalEl.innerText = formatINR(total);
-            titleEl.innerText = `(${cart.length} items)`;
-            refreshIcons();
-        }
-
-        function renderOrders() {
-            const container = document.getElementById('orders-list-full');
-            if (!container) return;
-
-            const safeOrders = Array.isArray(orders) ? orders : [];
-
-            if (safeOrders.length === 0) {
-                container.innerHTML = '<div class="text-center text-gray-500">No past orders.</div>';
-                return;
-            }
-
-            container.innerHTML = safeOrders.map(o => {
-                const itemsArray = Array.isArray(o.items) ? o.items : [];
-                const itemsText = itemsArray.length > 0
-                    ? itemsArray.map(i => i?.name || 'Item').join(', ')
-                    : 'No items';
-
-                const orderId = o._id ? String(o._id).slice(-6) : '------';
-                const date = o.date || '';
-                const total = formatINR(o.total || 0);
-                const status = o.status || 'Processing';
-
-                return `
-                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100">
-                        <div class="flex items-center gap-4">
-                            <div class="w-12 h-12 bg-white rounded flex items-center justify-center text-2xl">📦</div>
-                            <div>
-                                <p class="font-bold text-gray-800">Order #${orderId}</p>
-                                <p class="text-xs text-gray-500">${itemsText}</p>
-                                <p class="text-xs text-gray-400">${date}</p>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <p class="font-bold">${total}</p>
-                            <span class="text-xs px-2 py-1 ${getStatusColor(status)} rounded-full font-medium">${status}</span>
-                            ${status === 'Processing' ? `
-                                <button onclick="cancelOrder('${o._id}')" class="mt-2 text-xs text-red-600 hover:text-red-700">
-                                    Cancel Order
-                                </button>
-                            ` : ''}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function renderWishlist() {
-            const grid = document.getElementById('wishlist-grid');
-            const items = livestock.filter(item => wishlist.includes(item._id));
-            
-            if (items.length === 0) {
-                grid.innerHTML = '<div class="col-span-3 text-center text-gray-500">Your wishlist is empty.</div>';
-                return;
-            }
-
-            grid.innerHTML = items.map(item => `
-                <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm relative">
-                    <button onclick="toggleWishlist('${item._id}')" class="absolute top-4 right-4 text-red-500 bg-white rounded-full p-1 shadow">
-                        <i data-lucide="x" class="w-4 h-4"></i>
-                    </button>
-                    <div class="h-40 bg-gray-100 rounded-lg flex items-center justify-center text-6xl mb-4">
-                        ${item.image}
-                    </div>
-                    <h3 class="font-bold text-lg text-gray-800">${item.name}</h3>
-                    <div class="flex items-center justify-between mt-4">
-                        <span class="text-xl font-bold text-green-700">${formatINR(item.price)}</span>
-                        <div class="flex gap-2">
-                            <button onclick="buyNow('${item._id}')" class="bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700 transition">Buy Now</button>
-                            <button onclick="addToCart('${item._id}')" class="bg-gray-900 text-white px-3 py-2 rounded-lg text-sm">Add to Cart</button>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-            refreshIcons();
-        }
-
-        function renderAddresses() {
-            const container = document.getElementById('addresses-container');
-            if (!container) return;
-
-            if (addresses.length === 0) {
-                container.innerHTML = `
-                    <div class="text-sm text-gray-500 bg-gray-50 border border-dashed border-gray-200 rounded-lg p-4">
-                        No saved addresses yet. Add an address to use during checkout.
-                    </div>
-                `;
-                return;
-            }
-
-            container.innerHTML = addresses.map((a, index) => `
-                <div class="border rounded-lg p-4 bg-gray-50">
-                    <div class="flex justify-between items-start mb-2">
-                        <div>
-                            <p class="font-semibold text-gray-800">${a.label || 'Address'} • ${a.pincode}</p>
-                            <p class="text-xs text-gray-500">${a.name} • +91 ${a.phone}</p>
-                        </div>
-                        <div class="flex gap-2">
-                            <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">${a.label || 'Default'}</span>
-                            <button onclick="editAddress(${index})" class="text-blue-500 hover:bg-blue-50 p-1 rounded">
-                                <i data-lucide="edit" class="w-4 h-4"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <p class="text-sm text-gray-700">${a.line1 || a.line}</p>
-                    ${a.line2 ? `<p class="text-sm text-gray-700">${a.line2}</p>` : ''}
-                    <p class="text-sm text-gray-700 mt-1">${a.city}, ${a.state} - ${a.pincode}</p>
-                </div>
-            `).join('');
-            refreshIcons();
-        }
-
-        // --- CART / WISHLIST / CHECKOUT ACTIONS ---
-
-        function addToCart(id) {
-            const item = livestock.find(i => i._id === id);
-            if (item) {
-                const cartItem = { ...item, selected: true };
-                cart.push(cartItem);
-                updateCartBadge();
-                saveUserState();
-                showToast(`${item.name} added to cart`, 'success');
-                const active = document.querySelector('.nav-item.bg-green-600')?.getAttribute('onclick') || '';
-                if (active.includes('dashboard')) renderDashboard();
-            }
-        }
-
-        function removeFromCart(index) {
-            cart.splice(index, 1);
-            renderCart();
-            updateCartBadge();
-            saveUserState();
-        }
-
-        function toggleCartSelection(index, checked) {
-            if (!cart[index]) return;
-            cart[index].selected = checked;
-            saveUserState();
-            renderCart();
-        }
-
-        function toggleWishlist(id) {
-            const index = wishlist.indexOf(id);
-            if (index === -1) {
-                wishlist.push(id);
-                showToast('Added to wishlist', 'success');
-            } else {
-                wishlist.splice(index, 1);
-                showToast('Removed from wishlist', 'info');
-            }
-            saveUserState();
-            
-            // Update badges
-            updateWishlistBadge();
-            
-            const active = document.querySelector('.nav-item.bg-green-600')?.getAttribute('onclick') || '';
-            if (active.includes('wishlist')) renderWishlist();
-            if (active.includes('browse')) renderBrowse();
-            if (active.includes('dashboard')) renderDashboard();
-        }
-
-        function buyNow(id) {
-            const item = livestock.find(i => i._id === id);
-            if (item) {
-                currentOrderItems = [{ ...item, selected: true }];
-                showOrderSummary();
-            }
-        }
-
-        function showOrderSummary() {
-            if (currentOrderItems.length === 0) {
-                showToast('No items in order', 'error');
-                return;
-            }
-
-            // Check if user has addresses
-            if (addresses.length === 0) {
-                pendingCheckoutItems = currentOrderItems;
-                openAddressModal();
-                return;
-            }
-
-            // Set current address if not set
-            if (!currentAddress && addresses.length > 0) {
-                currentAddress = addresses[0];
-            }
-
-            const modal = document.getElementById('order-summary-modal');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-
-            // Render order items
-            const itemsContainer = document.getElementById('order-items');
-            const subtotal = currentOrderItems.reduce((sum, item) => sum + (item.price || 0), 0);
-            const delivery = subtotal > 5000 ? 0 : 200;
-            const total = subtotal + delivery;
-
-            itemsContainer.innerHTML = currentOrderItems.map(item => `
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div class="flex items-center gap-3">
-                        <div class="w-12 h-12 bg-white rounded flex items-center justify-center text-2xl border border-gray-200">${item.image}</div>
-                        <div>
-                            <h4 class="font-semibold text-gray-800">${item.name}</h4>
-                            <p class="text-sm text-gray-500">${item.breed}</p>
-                        </div>
-                    </div>
-                    <p class="font-bold">${formatINR(item.price)}</p>
-                </div>
-            `).join('');
-
-            // Render address
-            const addressContainer = document.getElementById('order-address');
-            if (currentAddress) {
-                addressContainer.innerHTML = `
-                    <p class="font-semibold">${currentAddress.name}</p>
-                    <p class="text-sm text-gray-600">${currentAddress.line1 || currentAddress.line}</p>
-                    ${currentAddress.line2 ? `<p class="text-sm text-gray-600">${currentAddress.line2}</p>` : ''}
-                    <p class="text-sm text-gray-600">${currentAddress.city}, ${currentAddress.state} - ${currentAddress.pincode}</p>
-                    <p class="text-sm text-gray-600">📱 +91 ${currentAddress.phone}</p>
-                `;
-            }
-
-            // Update price details
-            document.getElementById('order-subtotal').textContent = formatINR(subtotal);
-            document.getElementById('order-delivery').textContent = delivery === 0 ? 'FREE' : formatINR(delivery);
-            document.getElementById('order-total').textContent = formatINR(total);
-
-            // Reset payment selection
-            selectedPaymentMethod = null;
-            document.querySelectorAll('.payment-option').forEach(opt => {
-                opt.classList.remove('selected');
-                const input = opt.querySelector('input[type="radio"]');
-                if (input) input.checked = false;
-            });
-
-            refreshIcons();
-        }
-
-        function closeOrderSummary() {
-            const modal = document.getElementById('order-summary-modal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-            currentOrderItems = [];
-        }
-
-        function changeAddress() {
-            closeOrderSummary();
-            pendingCheckoutItems = currentOrderItems;
-            openAddressModal();
-        }
-
-        function selectPayment(method) {
-            selectedPaymentMethod = method;
-            document.querySelectorAll('.payment-option').forEach(opt => {
-                opt.classList.remove('selected');
-                const input = opt.querySelector('input[type="radio"]');
-                if (!input) return;
-                if (input.value === method) {
-                    opt.classList.add('selected');
-                    input.checked = true;
-                } else {
-                    opt.classList.remove('selected');
-                    input.checked = false;
-                }
-            });
-        }
-
-        async function confirmOrder() {
-            if (!selectedPaymentMethod) {
-                showToast('Please select a payment method', 'warning');
-                return;
-            }
-
-            if (!currentAddress) {
-                showToast('Please select a delivery address', 'warning');
-                return;
-            }
-
-            if (selectedPaymentMethod === 'cod') {
-                // For COD, create order directly
-                await createOrder();
-            } else {
-                // For other payment methods, show payment modal
-                closeOrderSummary();
-                showPaymentModal(selectedPaymentMethod);
-            }
-        }
-
-        // --- PAYMENT FUNCTIONS ---
-        
-        function switchPaymentTab(tab) {
-            currentPaymentTab = tab;
-            
-            // Update active tab
-            document.querySelectorAll('.payment-tab').forEach(t => {
-                if (t.getAttribute('data-tab') === tab) {
-                    t.classList.add('active');
-                } else {
-                    t.classList.remove('active');
-                }
-            });
-            
-            // Show active section
-            document.querySelectorAll('.payment-section').forEach(s => {
-                if (s.id === `${tab}-section`) {
-                    s.classList.remove('hidden');
-                } else {
-                    s.classList.add('hidden');
-                }
-            });
-        }
-
-        function redirectToUPIApp(appName) {
-            const orderTotal = currentOrderItems.reduce((sum, item) => sum + (item.price || 0), 0);
-            const delivery = orderTotal > 5000 ? 0 : 200;
-            const total = orderTotal + delivery;
-            
-            let upiUrl = '';
-            const merchantId = 'livestockmart@icici'; // Replace with your actual UPI ID
-            
-            switch(appName) {
-                case 'gpay':
-                    upiUrl = `upi://pay?pa=${merchantId}&pn=LivestockMart&am=${total}&cu=INR&tn=Livestock+Order`;
-                    showToast('Redirecting to Google Pay...', 'info');
-                    break;
-                case 'phonepay':
-                    upiUrl = `phonepe://pay?pa=${merchantId}&pn=LivestockMart&am=${total}&cu=INR`;
-                    showToast('Redirecting to PhonePe...', 'info');
-                    break;
-                case 'paytm':
-                    upiUrl = `paytmmp://pay?pa=${merchantId}&pn=LivestockMart&am=${total}&cu=INR`;
-                    showToast('Redirecting to Paytm...', 'info');
-                    break;
-                case 'bhim':
-                    upiUrl = `bhim://pay?pa=${merchantId}&pn=LivestockMart&am=${total}&cu=INR`;
-                    showToast('Redirecting to BHIM UPI...', 'info');
-                    break;
-            }
-            
-            // Show processing screen
-            document.getElementById('upi-section').classList.add('hidden');
-            document.getElementById('payment-processing').classList.remove('hidden');
-            
-            // Simulate UPI app redirection (in real app, this would redirect)
-            setTimeout(() => {
-                // Check if we're in a mobile app context
-                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                
-                if (isMobile) {
-                    // Attempt to open UPI app
-                    window.location.href = upiUrl;
-                    
-                    // Fallback: if app not installed, show manual instructions
-                    setTimeout(() => {
-                        showManualUPIPayment();
-                    }, 2000);
-                } else {
-                    // On desktop, show manual UPI instructions
-                    showManualUPIPayment();
-                }
-            }, 1500);
-        }
-
-        function showManualUPIPayment() {
-            const orderTotal = currentOrderItems.reduce((sum, item) => sum + (item.price || 0), 0);
-            const delivery = orderTotal > 5000 ? 0 : 200;
-            const total = orderTotal + delivery;
-            
-            const merchantId = 'livestockmart@icici'; // Replace with your actual UPI ID
-            
-            document.getElementById('payment-processing').classList.add('hidden');
-            
-            // Create manual UPI payment instructions
-            const upiSection = document.getElementById('upi-section');
-            upiSection.innerHTML = `
-                <div class="text-center py-6">
-                    <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i data-lucide="smartphone" class="w-8 h-8 text-gray-600"></i>
-                    </div>
-                    <h3 class="text-lg font-semibold mb-2">Open Your UPI App</h3>
-                    <p class="text-gray-600 mb-4">Complete payment using any UPI app</p>
-                    
-                    <div class="bg-gray-50 p-4 rounded-lg mb-6">
-                        <div class="text-center mb-3">
-                            <p class="text-sm text-gray-500 mb-1">Scan QR Code or Send to:</p>
-                            <div class="flex items-center justify-center gap-2 mb-2">
-                                <span class="font-mono text-lg font-bold">${merchantId}</span>
-                                <button onclick="copyUPIId('${merchantId}')" class="text-blue-600 hover:text-blue-800">
-                                    <i data-lucide="copy" class="w-4 h-4"></i>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <!-- QR Code Placeholder -->
-                        <div class="w-48 h-48 bg-white border-4 border-white mx-auto mb-4 relative">
-                            <div class="absolute inset-0 flex items-center justify-center">
-                                <div class="text-center">
-                                    <div class="w-32 h-32 bg-black mx-auto mb-2 relative">
-                                        <!-- Simulated QR pattern -->
-                                        <div class="absolute top-0 left-0 w-8 h-8 bg-black"></div>
-                                        <div class="absolute top-0 right-0 w-8 h-8 bg-black"></div>
-                                        <div class="absolute bottom-0 left-0 w-8 h-8 bg-black"></div>
-                                    </div>
-                                    <p class="text-xs text-gray-500">Scan with any UPI app</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="text-sm text-gray-600">
-                            <p class="mb-1">Amount: <span class="font-bold">₹${total.toLocaleString('en-IN')}</span></p>
-                            <p>Merchant: <span class="font-bold">LivestockMart</span></p>
-                        </div>
-                    </div>
-                    
-                    <div class="flex gap-3">
-                        <button onclick="switchPaymentTab('upi')" class="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-50">
-                            Back
-                        </button>
-                        <button onclick="verifyUPIPayment()" class="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
-                            I've Paid
-                        </button>
+                    <div class="text-right">
+                        <p class="font-bold">${total}</p>
+                        <span class="text-xs px-2 py-1 ${getStatusColor(status)} rounded-full font-medium">${status}</span>
                     </div>
                 </div>
             `;
-            upiSection.classList.remove('hidden');
-            refreshIcons();
-        }
+        }).join('');
+    }
 
-        function copyUPIId(upiId) {
-            navigator.clipboard.writeText(upiId)
-                .then(() => showToast('UPI ID copied to clipboard!', 'success'))
-                .catch(() => showToast('Failed to copy UPI ID', 'error'));
-        }
-
-        function verifyUPIPayment() {
-            // In a real app, you would verify payment with your backend
-            document.getElementById('upi-section').classList.add('hidden');
-            document.getElementById('payment-processing').classList.remove('hidden');
-            
-            setTimeout(() => {
-                document.getElementById('payment-processing').classList.add('hidden');
-                document.getElementById('payment-success').classList.remove('hidden');
-                
-                // Create the order after successful payment
-                setTimeout(() => createOrder(), 500);
-            }, 3000);
-        }
-
-        function processUPIPayment() {
-            const upiId = document.getElementById('upi-id').value.trim();
-            
-            if (!upiId || !upiId.includes('@')) {
-                showToast('Please enter a valid UPI ID', 'error');
-                return;
-            }
-            
-            showPaymentProcessing();
-            
-            // Simulate UPI payment processing
-            setTimeout(() => {
-                showPaymentSuccess();
-                createOrder();
-            }, 3000);
-        }
-
-        function processCardPayment() {
-            const cardNumber = document.getElementById('card-number').value.replace(/\s/g, '');
-            const cardExpiry = document.getElementById('card-expiry').value;
-            const cardCVV = document.getElementById('card-cvv').value;
-            const cardName = document.getElementById('card-name').value.trim();
-            
-            // Basic validation
-            if (!cardNumber || cardNumber.length < 16) {
-                showToast('Please enter a valid card number', 'error');
-                return;
-            }
-            
-            if (!/^\d{2}\/\d{2}$/.test(cardExpiry)) {
-                showToast('Please enter valid expiry date (MM/YY)', 'error');
-                return;
-            }
-            
-            if (!cardCVV || cardCVV.length !== 3) {
-                showToast('Please enter valid CVV', 'error');
-                return;
-            }
-            
-            if (!cardName) {
-                showToast('Please enter cardholder name', 'error');
-                return;
-            }
-            
-            showPaymentProcessing();
-            
-            // Simulate card payment processing
-            setTimeout(() => {
-                showPaymentSuccess();
-                createOrder();
-            }, 3000);
-        }
-
-        function processNetBanking() {
-            const selected = document.querySelector('input[name="bank"]:checked');
-            
-            if (!selected) {
-                showToast('Please select a bank', 'error');
-                return;
-            }
-            
-            selectedBank = selected.value;
-            showPaymentProcessing();
-            
-            // Simulate net banking redirection
-            setTimeout(() => {
-                showPaymentSuccess();
-                createOrder();
-            }, 4000);
-        }
-
-        function processWalletPayment() {
-            const selected = document.querySelector('input[name="wallet"]:checked');
-            
-            if (!selected) {
-                showToast('Please select a wallet', 'error');
-                return;
-            }
-            
-            selectedWallet = selected.value;
-            showPaymentProcessing();
-            
-            // Simulate wallet payment
-            setTimeout(() => {
-                showPaymentSuccess();
-                createOrder();
-            }, 3000);
-        }
-
-        function showPaymentProcessing() {
-            // Hide all payment sections
-            document.querySelectorAll('.payment-section').forEach(s => s.classList.add('hidden'));
-            document.getElementById('payment-tabs').classList.add('hidden');
-            document.getElementById('payment-processing').classList.remove('hidden');
-        }
-
-        function showPaymentSuccess() {
-            document.getElementById('payment-processing').classList.add('hidden');
-            document.getElementById('payment-success').classList.remove('hidden');
-        }
-
-        function showPaymentModal(method) {
-            const modal = document.getElementById('payment-modal');
-            const title = document.getElementById('payment-modal-title');
-            
-            // Reset to UPI tab by default
-            switchPaymentTab('upi');
-            
-            // Set specific tab based on method
-            if (method === 'card') {
-                setTimeout(() => switchPaymentTab('card'), 100);
-                title.innerText = 'Card Payment';
-            } else if (method === 'netbanking') {
-                setTimeout(() => switchPaymentTab('netbanking'), 100);
-                title.innerText = 'Net Banking';
-            } else if (method === 'wallet') {
-                setTimeout(() => switchPaymentTab('wallet'), 100);
-                title.innerText = 'Wallet Payment';
+    function filterCategory(cat) {
+        currentCategory = cat;
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            if (btn.innerText === cat || (cat === 'All' && btn.innerText === 'All')) {
+                btn.classList.add('bg-gray-800', 'text-white');
+                btn.classList.remove('bg-white', 'text-gray-600', 'border');
             } else {
-                title.innerText = 'UPI Payment';
+                btn.classList.remove('bg-gray-800', 'text-white');
+                btn.classList.add('bg-white', 'text-gray-600', 'border');
             }
-            
-            // Reset success and processing screens
-            document.getElementById('payment-success').classList.add('hidden');
-            document.getElementById('payment-processing').classList.add('hidden');
-            document.getElementById('payment-tabs').classList.remove('hidden');
-            
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            refreshIcons();
+        });
+        renderBrowse();
+    }
+
+    function renderBrowse() {
+        const searchInput = document.getElementById('search-input');
+        if (!searchInput) return;
+
+        const searchTerm = searchInput.value.toLowerCase();
+        const grid = document.getElementById('livestock-grid');
+        
+        const filtered = livestock.filter(item => {
+            const matchSearch = item.name.toLowerCase().includes(searchTerm) || 
+                              item.breed.toLowerCase().includes(searchTerm) ||
+                              (item.tags && item.tags.some(tag => tag.toLowerCase().includes(searchTerm)));
+            const matchCat = currentCategory === 'All' || item.type === currentCategory;
+            return matchSearch && matchCat;
+        });
+
+        if (filtered.length === 0) {
+            grid.innerHTML = '<div class="col-span-3 text-center text-gray-500 py-10">No livestock found matching your criteria.</div>';
+            return;
         }
 
-        function closePaymentModal() {
-            const modal = document.getElementById('payment-modal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
+        grid.innerHTML = filtered.map(item => {
+            const inWishlist = wishlist.includes(item._id);
+            return `
+            <div class="bg-white p-4 rounded-xl border border-gray-200 hover:shadow-lg transition-shadow">
+                <div class="h-40 bg-gray-100 rounded-lg flex items-center justify-center text-6xl mb-4 relative">
+                    ${item.image}
+                    <button onclick="toggleWishlist('${item._id}')" class="absolute top-2 right-2 p-2 bg-white rounded-full shadow-sm hover:text-red-500 ${inWishlist ? 'text-red-500' : 'text-gray-400'}">
+                        <i data-lucide="heart" class="w-4 h-4 ${inWishlist ? 'fill-current' : ''}"></i>
+                    </button>
+                </div>
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <h3 class="font-bold text-lg text-gray-800">${item.name}</h3>
+                        <p class="text-xs text-gray-500">${item.breed} • ${item.age} • ${item.type}</p>
+                        ${item.tags && item.tags.length > 0 ? `
+                            <div class="flex flex-wrap gap-1 mt-1">
+                                ${item.tags.map(tag => `<span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">${tag}</span>`).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                    <span class="bg-gray-800 text-white text-xs px-2 py-1 rounded">${item.status || 'Available'}</span>
+                </div>
+                <div class="flex items-center justify-between mt-4">
+                    <span class="text-xl font-bold text-green-700">${formatINR(item.price)}</span>
+                    <div class="flex gap-2">
+                        <button onclick="buyNow('${item._id}')" class="bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700 transition">Buy Now</button>
+                        <button onclick="addToCart('${item._id}')" class="bg-gray-900 text-white px-3 py-2 rounded-lg text-sm hover:bg-gray-800 transition">Add to Cart</button>
+                    </div>
+                </div>
+            </div>
+        `}).join('');
+        refreshIcons();
+    }
+
+    function renderCart() {
+        const container = document.getElementById('cart-items-container');
+        const totalEl = document.getElementById('cart-total');
+        const titleEl = document.getElementById('cart-count-title');
+        
+        if (cart.length === 0) {
+            container.innerHTML = '<div class="text-center py-10 text-gray-400">Your cart is empty</div>';
+            totalEl.innerText = '₹0';
+            titleEl.innerText = '(0 items)';
+            return;
         }
 
-        function closePaymentModalAndContinue() {
-            closePaymentModal();
-            router('browse');
+        let total = 0;
+        const selectedItems = cart.filter(item => item.selected !== false);
+        total = selectedItems.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
+
+        container.innerHTML = cart.map((item, index) => {
+            const isSelected = item.selected !== false;
+            const itemTotal = (item.price || 0) * (item.quantity || 1);
+            return `
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div class="flex items-center gap-4">
+                    <input type="checkbox" class="w-4 h-4 mt-1" ${isSelected ? 'checked' : ''} onchange="toggleCartSelection(${index}, this.checked)">
+                    <div class="w-16 h-16 bg-white rounded-lg flex items-center justify-center text-3xl border border-gray-200">${item.image}</div>
+                    <div>
+                        <h4 class="font-bold text-gray-800">${item.name}</h4>
+                        <p class="text-sm text-gray-500">${item.breed} • ${item.age}</p>
+                        <div class="flex items-center gap-2 mt-1">
+                            <button onclick="updateQuantity(${index}, ${(item.quantity || 1) - 1})" class="w-6 h-6 flex items-center justify-center border rounded">-</button>
+                            <span class="text-sm">${item.quantity || 1}</span>
+                            <button onclick="updateQuantity(${index}, ${(item.quantity || 1) + 1})" class="w-6 h-6 flex items-center justify-center border rounded">+</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-6">
+                    <p class="font-bold text-lg w-24 text-right">${formatINR(itemTotal)}</p>
+                    <button onclick="removeFromCart(${index})" class="text-red-500 hover:bg-red-50 p-2 rounded-full">
+                        <i data-lucide="trash-2" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+            `;
+        }).join('');
+        
+        totalEl.innerText = formatINR(total);
+        titleEl.innerText = `(${cart.length} items)`;
+        refreshIcons();
+    }
+
+    function updateQuantity(index, newQuantity) {
+        if (newQuantity < 1) return;
+        if (!cart[index]) return;
+        cart[index].quantity = newQuantity;
+        saveUserState();
+        renderCart();
+    }
+
+    function renderOrders() {
+        const container = document.getElementById('orders-list-full');
+        if (!container) return;
+
+        const safeOrders = Array.isArray(orders) ? orders : [];
+
+        if (safeOrders.length === 0) {
+            container.innerHTML = '<div class="text-center text-gray-500">No past orders.</div>';
+            return;
         }
 
-        function goToOrders() {
-            closePaymentModal();
-            router('orders');
+        container.innerHTML = safeOrders.map(o => {
+            const itemsArray = Array.isArray(o.items) ? o.items : [];
+            const itemsText = itemsArray.length > 0
+                ? itemsArray.map(i => i?.name || 'Item').join(', ')
+                : 'No items';
+
+            const orderId = o._id ? String(o._id).slice(-6) : '------';
+            const date = o.date || '';
+            const total = formatINR(o.total || 0);
+            const status = o.status || 'Processing';
+
+            return `
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-white rounded flex items-center justify-center text-2xl">📦</div>
+                        <div>
+                            <p class="font-bold text-gray-800">Order #${orderId}</p>
+                            <p class="text-xs text-gray-500">${itemsText}</p>
+                            <p class="text-xs text-gray-400">${date} • ${o.paymentMethod || 'COD'}</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-bold">${total}</p>
+                        <span class="text-xs px-2 py-1 ${getStatusColor(status)} rounded-full font-medium">${status}</span>
+                        ${status === 'Processing' ? `
+                            <button onclick="cancelOrder('${o._id}')" class="mt-2 text-xs text-red-600 hover:text-red-700">
+                                Cancel Order
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function renderWishlist() {
+        const grid = document.getElementById('wishlist-grid');
+        const items = livestock.filter(item => wishlist.includes(item._id));
+        
+        if (items.length === 0) {
+            grid.innerHTML = '<div class="col-span-3 text-center text-gray-500">Your wishlist is empty.</div>';
+            return;
         }
 
-        async function createOrder() {
-            const subtotal = currentOrderItems.reduce((sum, item) => sum + (item.price || 0), 0);
-            const delivery = subtotal > 5000 ? 0 : 200;
-            const total = subtotal + delivery;
-            const customerName = currentUser?.name || 'Guest User';
+        grid.innerHTML = items.map(item => `
+            <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm relative">
+                <button onclick="toggleWishlist('${item._id}')" class="absolute top-4 right-4 text-red-500 bg-white rounded-full p-1 shadow">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+                <div class="h-40 bg-gray-100 rounded-lg flex items-center justify-center text-6xl mb-4">
+                    ${item.image}
+                </div>
+                <h3 class="font-bold text-lg text-gray-800">${item.name}</h3>
+                <p class="text-sm text-gray-500">${item.breed} • ${item.age}</p>
+                <div class="flex items-center justify-between mt-4">
+                    <span class="text-xl font-bold text-green-700">${formatINR(item.price)}</span>
+                    <div class="flex gap-2">
+                        <button onclick="buyNow('${item._id}')" class="bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700 transition">Buy Now</button>
+                        <button onclick="addToCart('${item._id}')" class="bg-gray-900 text-white px-3 py-2 rounded-lg text-sm">Add to Cart</button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        refreshIcons();
+    }
 
-            const newOrder = {
-                date: new Date().toLocaleDateString(),
-                items: currentOrderItems.map(c => ({ id: c._id, name: c.name, price: c.price, breed: c.breed })),
-                total: total,
-                status: "Processing",
-                customer: customerName,
-                address: currentAddress,
-                paymentMethod: selectedPaymentMethod || 'cod'
-            };
+    function renderAddresses() {
+        const container = document.getElementById('addresses-container');
+        if (!container) return;
 
-            try {
-                const response = await fetch(`${API_URL}/orders`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify(newOrder)
-                });
-
-                if (response.ok) {
-                    // Clear items from cart if they were in cart
-                    if (cart.length > 0) {
-                        cart = cart.filter(item => item.selected === false);
-                        updateCartBadge();
-                        saveUserState();
-                    }
-
-                    currentOrderItems = [];
-                    showToast('Order placed successfully!', 'success');
-                    
-                    // Show success message in payment modal if it's open
-                    if (!document.getElementById('payment-modal').classList.contains('hidden')) {
-                        document.getElementById('upi-form')?.classList.add('hidden');
-                        document.getElementById('card-form')?.classList.add('hidden');
-                        document.getElementById('payment-success').classList.remove('hidden');
-                    } else {
-                        router('orders');
-                    }
-                } else {
-                    showToast('Failed to place order', 'error');
-                }
-            } catch (e) {
-                console.error(e);
-                showToast('Error placing order.', 'error');
-            }
+        if (addresses.length === 0) {
+            container.innerHTML = `
+                <div class="text-sm text-gray-500 bg-gray-50 border border-dashed border-gray-200 rounded-lg p-4">
+                    No saved addresses yet. Add an address to use during checkout.
+                </div>
+            `;
+            return;
         }
 
-        async function cancelOrder(orderId) {
-            if (!confirm('Are you sure you want to cancel this order?')) {
-                return;
-            }
+        container.innerHTML = addresses.map((a, index) => `
+            <div class="border rounded-lg p-4 bg-gray-50">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <p class="font-semibold text-gray-800">${a.label || 'Address'} • ${a.pincode}</p>
+                        <p class="text-xs text-gray-500">${a.name} • +91 ${a.phone}</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">${a.label || 'Default'}</span>
+                        <button onclick="editAddress(${index})" class="text-blue-500 hover:bg-blue-50 p-1 rounded">
+                            <i data-lucide="edit" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+                <p class="text-sm text-gray-700">${a.line1 || a.line}</p>
+                ${a.line2 ? `<p class="text-sm text-gray-700">${a.line2}</p>` : ''}
+                <p class="text-sm text-gray-700 mt-1">${a.city}, ${a.state} - ${a.pincode}</p>
+            </div>
+        `).join('');
+        refreshIcons();
+    }
 
-            try {
-                const response = await fetch(`${API_URL}/orders/${orderId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ status: 'Cancelled' })
-                });
-
-                if (response.ok) {
-                    showToast('Order cancelled successfully', 'success');
-                    loadData();
-                    renderOrders();
-                } else {
-                    showToast('Failed to cancel order', 'error');
-                }
-            } catch (e) {
-                console.error(e);
-                showToast('Error cancelling order', 'error');
-            }
-        }
-
-        function openAddressModal(index) {
-            editingAddressIndex = index !== undefined ? index : -1;
-            const modal = document.getElementById('address-modal');
-            const title = document.getElementById('address-modal-title');
-            
-            if (!modal) return;
-            
-            if (editingAddressIndex >= 0 && addresses[editingAddressIndex]) {
-                // Edit mode
-                title.innerText = 'Edit Address';
-                const a = addresses[editingAddressIndex];
-                document.getElementById('addr-name').value = a.name || '';
-                document.getElementById('addr-phone').value = a.phone || '';
-                document.getElementById('addr-line').value = a.line1 || a.line || '';
-                document.getElementById('addr-city').value = a.city || '';
-                document.getElementById('addr-state').value = a.state || '';
-                document.getElementById('addr-pincode').value = a.pincode || '';
+    // --- CART / WISHLIST / CHECKOUT ACTIONS ---
+    function addToCart(id) {
+        const item = livestock.find(i => i._id === id);
+        if (item) {
+            // Check if item already in cart
+            const existingIndex = cart.findIndex(cartItem => cartItem._id === id);
+            if (existingIndex > -1) {
+                cart[existingIndex].quantity = (cart[existingIndex].quantity || 1) + 1;
             } else {
-                // Add mode
-                title.innerText = 'Add New Address';
-                document.getElementById('address-form').reset();
+                const cartItem = { 
+                    ...item, 
+                    selected: true, 
+                    quantity: 1 
+                };
+                cart.push(cartItem);
             }
-            
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        }
-
-        function closeAddressModal() {
-            const modal = document.getElementById('address-modal');
-            if (!modal) return;
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-            editingAddressIndex = -1;
-        }
-
-        function editAddress(index) {
-            openAddressModal(index);
-        }
-
-        async function submitAddress(event) {
-            event.preventDefault();
-            const name = document.getElementById('addr-name').value.trim();
-            const phone = document.getElementById('addr-phone').value.trim();
-            const line = document.getElementById('addr-line').value.trim();
-            const city = document.getElementById('addr-city').value.trim();
-            const state = document.getElementById('addr-state').value.trim();
-            const pincode = document.getElementById('addr-pincode').value.trim();
-
-            if (!name || !phone || !line || !city || !state || !pincode) {
-                showToast('Please fill all address fields.', 'warning');
-                return;
-            }
-            if (!/^[0-9]{10}$/.test(phone)) {
-                showToast('Phone number must be 10 digits.', 'warning');
-                return;
-            }
-            if (!/^[0-9]{6}$/.test(pincode)) {
-                showToast('Pincode must be 6 digits.', 'warning');
-                return;
-            }
-
-            const addressData = { 
-                name, 
-                phone, 
-                line1: line, 
-                city, 
-                state, 
-                pincode,
-                label: addresses.length === 0 ? 'Default' : `Address ${addresses.length + 1}`
-            };
-
-            if (editingAddressIndex >= 0) {
-                // Update existing address
-                addresses[editingAddressIndex] = { ...addresses[editingAddressIndex], ...addressData };
-                showToast('Address updated', 'success');
-            } else {
-                // Add new address
-                addresses.push(addressData);
-                showToast('Address added', 'success');
-            }
-
-            // Set current address if none is set
-            if (!currentAddress || editingAddressIndex === 0) {
-                currentAddress = addresses[0];
-            }
-
+            updateCartBadge();
             saveUserState();
-            renderAddresses();
-            closeAddressModal();
-
-            // If we were in the middle of checkout, show order summary
-            if (pendingCheckoutItems && pendingCheckoutItems.length > 0) {
-                currentOrderItems = pendingCheckoutItems;
-                pendingCheckoutItems = null;
-                setTimeout(() => showOrderSummary(), 300);
-            }
+            showToast(`${item.name} added to cart`, 'success');
+            const active = document.querySelector('.nav-item.bg-green-600')?.getAttribute('onclick') || '';
+            if (active.includes('dashboard')) renderDashboard();
         }
+    }
 
-        async function checkout() {
-            if (cart.length === 0) {
-                showToast('Your cart is empty.', 'warning');
-                return;
-            }
-            const itemsToBuy = cart.filter(item => item.selected !== false);
-            if (itemsToBuy.length === 0) {
-                showToast('Please select at least one item to checkout.', 'warning');
-                return;
-            }
+    function removeFromCart(index) {
+        cart.splice(index, 1);
+        renderCart();
+        updateCartBadge();
+        saveUserState();
+        showToast('Item removed from cart', 'info');
+    }
 
-            currentOrderItems = itemsToBuy;
+    function toggleCartSelection(index, checked) {
+        if (!cart[index]) return;
+        cart[index].selected = checked;
+        saveUserState();
+        renderCart();
+    }
+
+    function toggleWishlist(id) {
+        const index = wishlist.indexOf(id);
+        if (index === -1) {
+            wishlist.push(id);
+            showToast('Added to wishlist', 'success');
+        } else {
+            wishlist.splice(index, 1);
+            showToast('Removed from wishlist', 'info');
+        }
+        saveUserState();
+        
+        // Update badges
+        updateWishlistBadge();
+        
+        const active = document.querySelector('.nav-item.bg-green-600')?.getAttribute('onclick') || '';
+        if (active.includes('wishlist')) renderWishlist();
+        if (active.includes('browse')) renderBrowse();
+        if (active.includes('dashboard')) renderDashboard();
+    }
+
+    function buyNow(id) {
+        const item = livestock.find(i => i._id === id);
+        if (item) {
+            currentOrderItems = [{ ...item, selected: true, quantity: 1 }];
             showOrderSummary();
         }
+    }
 
-        function updateCartBadge() {
-            const badges = [document.getElementById('cart-badge'), document.getElementById('header-cart-badge')];
-            badges.forEach(b => {
-                if (!b) return;
-                b.innerText = cart.length;
-                if (cart.length > 0) b.classList.remove('hidden');
-                else b.classList.add('hidden');
-            });
+    function showOrderSummary() {
+        if (currentOrderItems.length === 0) {
+            showToast('No items in order', 'error');
+            return;
         }
 
-        function updateWishlistBadge() {
-            const badge = document.getElementById('header-wishlist-badge');
-            if (!badge) return;
-            
-            badge.innerText = wishlist.length;
-            if (wishlist.length > 0) {
-                badge.classList.remove('hidden');
-            } else {
-                badge.classList.add('hidden');
-            }
+        // Check if user has addresses
+        if (addresses.length === 0) {
+            pendingCheckoutItems = currentOrderItems;
+            openAddressModal();
+            return;
         }
 
-        function getStatusColor(status) {
-            if (status === 'Shipped') return 'bg-blue-100 text-blue-700';
-            if (status === 'Delivered') return 'bg-gray-800 text-white';
-            if (status === 'Processing') return 'bg-yellow-100 text-yellow-800';
-            if (status === 'Cancelled') return 'bg-red-100 text-red-700';
-            return 'bg-gray-100 text-gray-800';
+        // Set current address if not set
+        if (!currentAddress && addresses.length > 0) {
+            currentAddress = addresses[0];
         }
 
-        // --- INIT APP ---
+        const modal = document.getElementById('order-summary-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
 
-        function initApp() {
-            if (appInitialized) return;
-            appInitialized = true;
+        // Render order items
+        const itemsContainer = document.getElementById('order-items');
+        const subtotal = currentOrderItems.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
+        const delivery = subtotal > 5000 ? 0 : 200;
+        const total = subtotal + delivery;
 
-            updateCartBadge();
-            updateWishlistBadge();
-            const dateOptions = { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' };
-            const dateEl = document.getElementById('current-date');
-            if (dateEl) {
-                dateEl.innerText = new Date().toLocaleDateString('en-IN', dateOptions);
-            }
-            router('dashboard');
+        itemsContainer.innerHTML = currentOrderItems.map(item => `
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-white rounded flex items-center justify-center text-2xl border border-gray-200">${item.image}</div>
+                    <div>
+                        <h4 class="font-semibold text-gray-800">${item.name}</h4>
+                        <p class="text-sm text-gray-500">${item.breed} • Qty: ${item.quantity || 1}</p>
+                    </div>
+                </div>
+                <p class="font-bold">${formatINR(item.price * (item.quantity || 1))}</p>
+            </div>
+        `).join('');
+
+        // Render address
+        const addressContainer = document.getElementById('order-address');
+        if (currentAddress) {
+            addressContainer.innerHTML = `
+                <p class="font-semibold">${currentAddress.name}</p>
+                <p class="text-sm text-gray-600">${currentAddress.line1 || currentAddress.line}</p>
+                ${currentAddress.line2 ? `<p class="text-sm text-gray-600">${currentAddress.line2}</p>` : ''}
+                <p class="text-sm text-gray-600">${currentAddress.city}, ${currentAddress.state} - ${currentAddress.pincode}</p>
+                <p class="text-sm text-gray-600">📱 +91 ${currentAddress.phone}</p>
+            `;
         }
 
-        function attachEventListeners() {
-            const loginForm = document.getElementById('login-form');
-            const registerForm = document.getElementById('register-form');
+        // Update price details
+        document.getElementById('order-subtotal').textContent = formatINR(subtotal);
+        document.getElementById('order-delivery').textContent = delivery === 0 ? 'FREE' : formatINR(delivery);
+        document.getElementById('order-total').textContent = formatINR(total);
 
-            if (loginForm) loginForm.addEventListener('submit', handleLogin);
-            if (registerForm) registerForm.addEventListener('submit', handleRegister);
-
-            document.addEventListener('click', (e) => {
-                const menu = document.getElementById('profile-menu');
-                const btn = document.getElementById('profile-button');
-                if (!menu || !btn) return;
-                if (!menu.contains(e.target) && !btn.contains(e.target)) {
-                    menu.classList.add('hidden');
-                }
-            });
-
-            // Format card number input
-            document.addEventListener('input', function(e) {
-                if (e.target.id === 'card-number') {
-                    let value = e.target.value.replace(/\s/g, '');
-                    if (value.length > 0) {
-                        value = value.match(/.{1,4}/g).join(' ');
-                        e.target.value = value.substring(0, 19);
-                    }
-                }
-                
-                if (e.target.id === 'card-expiry') {
-                    let value = e.target.value.replace(/\D/g, '');
-                    if (value.length >= 2) {
-                        value = value.substring(0, 2) + '/' + value.substring(2, 4);
-                    }
-                    e.target.value = value.substring(0, 5);
-                }
-            });
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            attachEventListeners();
-            checkAuth();
-            refreshIcons();
+        // Reset payment selection
+        selectedPaymentMethod = null;
+        document.querySelectorAll('.payment-option').forEach(opt => {
+            opt.classList.remove('selected');
+            const input = opt.querySelector('input[type="radio"]');
+            if (input) input.checked = false;
         });
-    </script>
+
+        refreshIcons();
+    }
+
+    function closeOrderSummary() {
+        const modal = document.getElementById('order-summary-modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        currentOrderItems = [];
+    }
+
+    function changeAddress() {
+        closeOrderSummary();
+        pendingCheckoutItems = currentOrderItems;
+        openAddressModal();
+    }
+
+    function selectPayment(method) {
+        selectedPaymentMethod = method;
+        document.querySelectorAll('.payment-option').forEach(opt => {
+            opt.classList.remove('selected');
+            const input = opt.querySelector('input[type="radio"]');
+            if (!input) return;
+            if (input.value === method) {
+                opt.classList.add('selected');
+                input.checked = true;
+            } else {
+                opt.classList.remove('selected');
+                input.checked = false;
+            }
+        });
+    }
+
+    async function confirmOrder() {
+        if (!selectedPaymentMethod) {
+            showToast('Please select a payment method', 'warning');
+            return;
+        }
+
+        if (!currentAddress) {
+            showToast('Please select a delivery address', 'warning');
+            return;
+        }
+
+        if (selectedPaymentMethod === 'cod') {
+            // For COD, create order directly
+            await createOrder();
+        } else {
+            // For other payment methods, show payment modal
+            closeOrderSummary();
+            showPaymentModal(selectedPaymentMethod);
+        }
+    }
+
+    // --- PAYMENT FUNCTIONS ---
+    function switchPaymentTab(tab) {
+        currentPaymentTab = tab;
+        
+        // Update active tab
+        document.querySelectorAll('.payment-tab').forEach(t => {
+            if (t.getAttribute('data-tab') === tab) {
+                t.classList.add('active');
+            } else {
+                t.classList.remove('active');
+            }
+        });
+        
+        // Show active section
+        document.querySelectorAll('.payment-section').forEach(s => {
+            if (s.id === `${tab}-section`) {
+                s.classList.remove('hidden');
+            } else {
+                s.classList.add('hidden');
+            }
+        });
+    }
+
+    function redirectToUPIApp(appName) {
+        const orderTotal = currentOrderItems.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
+        const delivery = orderTotal > 5000 ? 0 : 200;
+        const total = orderTotal + delivery;
+        
+        let upiUrl = '';
+        const merchantId = 'livestockmart@icici';
+        
+        switch(appName) {
+            case 'gpay':
+                upiUrl = `upi://pay?pa=${merchantId}&pn=LivestockMart&am=${total}&cu=INR&tn=Livestock+Order`;
+                showToast('Redirecting to Google Pay...', 'info');
+                break;
+            case 'phonepay':
+                upiUrl = `phonepe://pay?pa=${merchantId}&pn=LivestockMart&am=${total}&cu=INR`;
+                showToast('Redirecting to PhonePe...', 'info');
+                break;
+            case 'paytm':
+                upiUrl = `paytmmp://pay?pa=${merchantId}&pn=LivestockMart&am=${total}&cu=INR`;
+                showToast('Redirecting to Paytm...', 'info');
+                break;
+            case 'bhim':
+                upiUrl = `bhim://pay?pa=${merchantId}&pn=LivestockMart&am=${total}&cu=INR`;
+                showToast('Redirecting to BHIM UPI...', 'info');
+                break;
+        }
+        
+        // Show processing screen
+        document.getElementById('upi-section').classList.add('hidden');
+        document.getElementById('payment-processing').classList.remove('hidden');
+        
+        // Simulate UPI app redirection
+        setTimeout(() => {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            if (isMobile) {
+                window.location.href = upiUrl;
+                setTimeout(() => {
+                    showManualUPIPayment();
+                }, 2000);
+            } else {
+                showManualUPIPayment();
+            }
+        }, 1500);
+    }
+
+    function showManualUPIPayment() {
+        const orderTotal = currentOrderItems.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
+        const delivery = orderTotal > 5000 ? 0 : 200;
+        const total = orderTotal + delivery;
+        
+        const merchantId = 'livestockmart@icici';
+        
+        document.getElementById('payment-processing').classList.add('hidden');
+        
+        const upiSection = document.getElementById('upi-section');
+        upiSection.innerHTML = `
+            <div class="text-center py-6">
+                <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="smartphone" class="w-8 h-8 text-gray-600"></i>
+                </div>
+                <h3 class="text-lg font-semibold mb-2">Open Your UPI App</h3>
+                <p class="text-gray-600 mb-4">Complete payment using any UPI app</p>
+                
+                <div class="bg-gray-50 p-4 rounded-lg mb-6">
+                    <div class="text-center mb-3">
+                        <p class="text-sm text-gray-500 mb-1">Scan QR Code or Send to:</p>
+                        <div class="flex items-center justify-center gap-2 mb-2">
+                            <span class="font-mono text-lg font-bold">${merchantId}</span>
+                            <button onclick="copyUPIId('${merchantId}')" class="text-blue-600 hover:text-blue-800">
+                                <i data-lucide="copy" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- QR Code Placeholder -->
+                    <div class="w-48 h-48 bg-white border-4 border-white mx-auto mb-4 relative">
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <div class="text-center">
+                                <div class="w-32 h-32 bg-black mx-auto mb-2 relative">
+                                    <div class="absolute top-0 left-0 w-8 h-8 bg-black"></div>
+                                    <div class="absolute top-0 right-0 w-8 h-8 bg-black"></div>
+                                    <div class="absolute bottom-0 left-0 w-8 h-8 bg-black"></div>
+                                </div>
+                                <p class="text-xs text-gray-500">Scan with any UPI app</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-sm text-gray-600">
+                        <p class="mb-1">Amount: <span class="font-bold">₹${total.toLocaleString('en-IN')}</span></p>
+                        <p>Merchant: <span class="font-bold">LivestockMart</span></p>
+                    </div>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button onclick="switchPaymentTab('upi')" class="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-50">
+                        Back
+                    </button>
+                    <button onclick="verifyUPIPayment()" class="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
+                        I've Paid
+                    </button>
+                </div>
+            </div>
+        `;
+        upiSection.classList.remove('hidden');
+        refreshIcons();
+    }
+
+    function copyUPIId(upiId) {
+        navigator.clipboard.writeText(upiId)
+            .then(() => showToast('UPI ID copied to clipboard!', 'success'))
+            .catch(() => showToast('Failed to copy UPI ID', 'error'));
+    }
+
+    function verifyUPIPayment() {
+        document.getElementById('upi-section').classList.add('hidden');
+        document.getElementById('payment-processing').classList.remove('hidden');
+        
+        setTimeout(() => {
+            document.getElementById('payment-processing').classList.add('hidden');
+            document.getElementById('payment-success').classList.remove('hidden');
+            
+            setTimeout(() => createOrder(), 500);
+        }, 3000);
+    }
+
+    function processUPIPayment() {
+        const upiId = document.getElementById('upi-id').value.trim();
+        
+        if (!upiId || !upiId.includes('@')) {
+            showToast('Please enter a valid UPI ID', 'error');
+            return;
+        }
+        
+        showPaymentProcessing();
+        
+        setTimeout(() => {
+            showPaymentSuccess();
+            createOrder();
+        }, 3000);
+    }
+
+    function processCardPayment() {
+        const cardNumber = document.getElementById('card-number').value.replace(/\s/g, '');
+        const cardExpiry = document.getElementById('card-expiry').value;
+        const cardCVV = document.getElementById('card-cvv').value;
+        const cardName = document.getElementById('card-name').value.trim();
+        
+        if (!cardNumber || cardNumber.length < 16) {
+            showToast('Please enter a valid card number', 'error');
+            return;
+        }
+        
+        if (!/^\d{2}\/\d{2}$/.test(cardExpiry)) {
+            showToast('Please enter valid expiry date (MM/YY)', 'error');
+            return;
+        }
+        
+        if (!cardCVV || cardCVV.length !== 3) {
+            showToast('Please enter valid CVV', 'error');
+            return;
+        }
+        
+        if (!cardName) {
+            showToast('Please enter cardholder name', 'error');
+            return;
+        }
+        
+        showPaymentProcessing();
+        
+        setTimeout(() => {
+            showPaymentSuccess();
+            createOrder();
+        }, 3000);
+    }
+
+    function processNetBanking() {
+        const selected = document.querySelector('input[name="bank"]:checked');
+        
+        if (!selected) {
+            showToast('Please select a bank', 'error');
+            return;
+        }
+        
+        selectedBank = selected.value;
+        showPaymentProcessing();
+        
+        setTimeout(() => {
+            showPaymentSuccess();
+            createOrder();
+        }, 4000);
+    }
+
+    function processWalletPayment() {
+        const selected = document.querySelector('input[name="wallet"]:checked');
+        
+        if (!selected) {
+            showToast('Please select a wallet', 'error');
+            return;
+        }
+        
+        selectedWallet = selected.value;
+        showPaymentProcessing();
+        
+        setTimeout(() => {
+            showPaymentSuccess();
+            createOrder();
+        }, 3000);
+    }
+
+    function showPaymentProcessing() {
+        document.querySelectorAll('.payment-section').forEach(s => s.classList.add('hidden'));
+        document.getElementById('payment-tabs').classList.add('hidden');
+        document.getElementById('payment-processing').classList.remove('hidden');
+    }
+
+    function showPaymentSuccess() {
+        document.getElementById('payment-processing').classList.add('hidden');
+        document.getElementById('payment-success').classList.remove('hidden');
+    }
+
+    function showPaymentModal(method) {
+        const modal = document.getElementById('payment-modal');
+        const title = document.getElementById('payment-modal-title');
+        
+        switchPaymentTab('upi');
+        
+        if (method === 'card') {
+            setTimeout(() => switchPaymentTab('card'), 100);
+            title.innerText = 'Card Payment';
+        } else if (method === 'netbanking') {
+            setTimeout(() => switchPaymentTab('netbanking'), 100);
+            title.innerText = 'Net Banking';
+        } else if (method === 'wallet') {
+            setTimeout(() => switchPaymentTab('wallet'), 100);
+            title.innerText = 'Wallet Payment';
+        } else {
+            title.innerText = 'UPI Payment';
+        }
+        
+        document.getElementById('payment-success').classList.add('hidden');
+        document.getElementById('payment-processing').classList.add('hidden');
+        document.getElementById('payment-tabs').classList.remove('hidden');
+        
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        refreshIcons();
+    }
+
+    function closePaymentModal() {
+        const modal = document.getElementById('payment-modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    function closePaymentModalAndContinue() {
+        closePaymentModal();
+        router('browse');
+    }
+
+    function goToOrders() {
+        closePaymentModal();
+        router('orders');
+    }
+
+    async function createOrder() {
+        const subtotal = currentOrderItems.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
+        const delivery = subtotal > 5000 ? 0 : 200;
+        const total = subtotal + delivery;
+        const customerName = currentUser?.name || 'Guest User';
+
+        const newOrder = {
+            date: new Date().toLocaleDateString('en-IN'),
+            items: currentOrderItems.map(c => ({ 
+                id: c._id, 
+                name: c.name, 
+                price: c.price, 
+                breed: c.breed,
+                quantity: c.quantity || 1
+            })),
+            total: total,
+            status: "Processing",
+            customer: customerName,
+            address: currentAddress,
+            paymentMethod: selectedPaymentMethod || 'cod',
+            paymentStatus: selectedPaymentMethod === 'cod' ? 'Pending' : 'Completed'
+        };
+
+        try {
+            const response = await fetch(`${API_URL}/orders`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(newOrder)
+            });
+
+            if (response.ok) {
+                // Clear items from cart if they were in cart
+                if (cart.length > 0) {
+                    cart = cart.filter(item => item.selected === false);
+                    updateCartBadge();
+                    saveUserState();
+                }
+
+                currentOrderItems = [];
+                showToast('Order placed successfully!', 'success');
+                
+                if (!document.getElementById('payment-modal').classList.contains('hidden')) {
+                    document.getElementById('upi-form')?.classList.add('hidden');
+                    document.getElementById('card-form')?.classList.add('hidden');
+                    document.getElementById('payment-success').classList.remove('hidden');
+                } else {
+                    router('orders');
+                }
+            } else {
+                const errorData = await response.json();
+                showToast(errorData.message || 'Failed to place order', 'error');
+            }
+        } catch (e) {
+            console.error(e);
+            showToast('Error placing order.', 'error');
+        }
+    }
+
+    async function cancelOrder(orderId) {
+        if (!confirm('Are you sure you want to cancel this order?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_URL}/orders/${orderId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ status: 'Cancelled' })
+            });
+
+            if (response.ok) {
+                showToast('Order cancelled successfully', 'success');
+                loadData();
+                renderOrders();
+            } else {
+                showToast('Failed to cancel order', 'error');
+            }
+        } catch (e) {
+            console.error(e);
+            showToast('Error cancelling order', 'error');
+        }
+    }
+
+    function openAddressModal(index) {
+        editingAddressIndex = index !== undefined ? index : -1;
+        const modal = document.getElementById('address-modal');
+        const title = document.getElementById('address-modal-title');
+        
+        if (!modal) return;
+        
+        if (editingAddressIndex >= 0 && addresses[editingAddressIndex]) {
+            title.innerText = 'Edit Address';
+            const a = addresses[editingAddressIndex];
+            document.getElementById('addr-name').value = a.name || '';
+            document.getElementById('addr-phone').value = a.phone || '';
+            document.getElementById('addr-line').value = a.line1 || a.line || '';
+            document.getElementById('addr-city').value = a.city || '';
+            document.getElementById('addr-state').value = a.state || '';
+            document.getElementById('addr-pincode').value = a.pincode || '';
+        } else {
+            title.innerText = 'Add New Address';
+            document.getElementById('address-form').reset();
+        }
+        
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    function closeAddressModal() {
+        const modal = document.getElementById('address-modal');
+        if (!modal) return;
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        editingAddressIndex = -1;
+    }
+
+    function editAddress(index) {
+        openAddressModal(index);
+    }
+
+    async function submitAddress(event) {
+        event.preventDefault();
+        const name = document.getElementById('addr-name').value.trim();
+        const phone = document.getElementById('addr-phone').value.trim();
+        const line = document.getElementById('addr-line').value.trim();
+        const city = document.getElementById('addr-city').value.trim();
+        const state = document.getElementById('addr-state').value.trim();
+        const pincode = document.getElementById('addr-pincode').value.trim();
+
+        if (!name || !phone || !line || !city || !state || !pincode) {
+            showToast('Please fill all address fields.', 'warning');
+            return;
+        }
+        if (!/^[0-9]{10}$/.test(phone)) {
+            showToast('Phone number must be 10 digits.', 'warning');
+            return;
+        }
+        if (!/^[0-9]{6}$/.test(pincode)) {
+            showToast('Pincode must be 6 digits.', 'warning');
+            return;
+        }
+
+        const addressData = { 
+            name, 
+            phone, 
+            line1: line, 
+            city, 
+            state, 
+            pincode,
+            label: addresses.length === 0 ? 'Default' : `Address ${addresses.length + 1}`
+        };
+
+        if (editingAddressIndex >= 0) {
+            addresses[editingAddressIndex] = { ...addresses[editingAddressIndex], ...addressData };
+            showToast('Address updated', 'success');
+        } else {
+            addresses.push(addressData);
+            showToast('Address added', 'success');
+        }
+
+        if (!currentAddress || editingAddressIndex === 0) {
+            currentAddress = addresses[0];
+        }
+
+        saveUserState();
+        renderAddresses();
+        closeAddressModal();
+
+        if (pendingCheckoutItems && pendingCheckoutItems.length > 0) {
+            currentOrderItems = pendingCheckoutItems;
+            pendingCheckoutItems = null;
+            setTimeout(() => showOrderSummary(), 300);
+        }
+    }
+
+    async function checkout() {
+        if (cart.length === 0) {
+            showToast('Your cart is empty.', 'warning');
+            return;
+        }
+        const itemsToBuy = cart.filter(item => item.selected !== false);
+        if (itemsToBuy.length === 0) {
+            showToast('Please select at least one item to checkout.', 'warning');
+            return;
+        }
+
+        currentOrderItems = itemsToBuy;
+        showOrderSummary();
+    }
+
+    function updateCartBadge() {
+        const badges = [document.getElementById('cart-badge'), document.getElementById('header-cart-badge')];
+        badges.forEach(b => {
+            if (!b) return;
+            b.innerText = cart.length;
+            if (cart.length > 0) b.classList.remove('hidden');
+            else b.classList.add('hidden');
+        });
+    }
+
+    function updateWishlistBadge() {
+        const badge = document.getElementById('header-wishlist-badge');
+        if (!badge) return;
+        
+        badge.innerText = wishlist.length;
+        if (wishlist.length > 0) {
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
+
+    function getStatusColor(status) {
+        if (status === 'Shipped') return 'bg-blue-100 text-blue-700';
+        if (status === 'Delivered') return 'bg-gray-800 text-white';
+        if (status === 'Processing') return 'bg-yellow-100 text-yellow-800';
+        if (status === 'Cancelled') return 'bg-red-100 text-red-700';
+        return 'bg-gray-100 text-gray-800';
+    }
+
+    // --- INIT APP ---
+    function initApp() {
+        if (appInitialized) return;
+        appInitialized = true;
+
+        updateCartBadge();
+        updateWishlistBadge();
+        const dateOptions = { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' };
+        const dateEl = document.getElementById('current-date');
+        if (dateEl) {
+            dateEl.innerText = new Date().toLocaleDateString('en-IN', dateOptions);
+        }
+        router('dashboard');
+    }
+
+    function attachEventListeners() {
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+
+        if (loginForm) loginForm.addEventListener('submit', handleLogin);
+        if (registerForm) registerForm.addEventListener('submit', handleRegister);
+
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('profile-menu');
+            const btn = document.getElementById('profile-button');
+            if (!menu || !btn) return;
+            if (!menu.contains(e.target) && !btn.contains(e.target)) {
+                menu.classList.add('hidden');
+            }
+        });
+
+        // Format card number input
+        document.addEventListener('input', function(e) {
+            if (e.target.id === 'card-number') {
+                let value = e.target.value.replace(/\s/g, '');
+                if (value.length > 0) {
+                    value = value.match(/.{1,4}/g).join(' ');
+                    e.target.value = value.substring(0, 19);
+                }
+            }
+            
+            if (e.target.id === 'card-expiry') {
+                let value = e.target.value.replace(/\D/g, '');
+                if (value.length >= 2) {
+                    value = value.substring(0, 2) + '/' + value.substring(2, 4);
+                }
+                e.target.value = value.substring(0, 5);
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        attachEventListeners();
+        checkAuth();
+        refreshIcons();
+    });
+</script>
 </body>
 </html>
