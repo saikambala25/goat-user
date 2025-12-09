@@ -11,13 +11,11 @@ const orderSchema = new mongoose.Schema({
         breed: String
     }],
     total: { type: Number, required: true },
-    // Added 'Confirmed' for paid orders
-    status: { type: String, default: 'Processing', enum: ['Processing', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled'] }, 
-    paymentMethod: { type: String, default: 'COD' }, // Added payment method field
+    status: { type: String, default: 'Processing' }, // Processing, Shipped, Delivered
     address: {
         name: String,
         phone: String,
-        line: String, // Matches the 'line' field passed from frontend's order creation
+        line: String,
         city: String,
         state: String,
         pincode: String
