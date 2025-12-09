@@ -244,7 +244,7 @@ app.delete('/api/livestock/:id', async (req, res) => {
 // 4. Get Orders (user-specific)
 app.get('/api/orders', authMiddleware, async (req, res) => {
   try {
-    // Filter orders by userId instead of customer name for robustness
+    // Only return orders for the current user
     const orders = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
@@ -255,7 +255,7 @@ app.get('/api/orders', authMiddleware, async (req, res) => {
 // 5. Create Order
 app.post('/api/orders', authMiddleware, async (req, res) => {
   try {
-    // Add the current user info and use all data from request body
+    // Add the current user to the order
     const orderData = {
       ...req.body,
       customer: req.user.name,
@@ -266,30 +266,26 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
     await newOrder.save();
     res.status(201).json(newOrder);
   } catch (err) {
-    console.error('Create Order Error:', err);
     res.status(400).json({ error: err.message });
   }
 });
 
-// 6. Update Order Status (for user to cancel or for admin in a real app)
+// 6. Update Order Status
 app.put('/api/orders/:id', authMiddleware, async (req, res) => {
   try {
-    const { status } = req.body;
-    
+    // Only allow the user who created the order to update it
     const order = await Order.findById(req.params.id);
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
     
-    // Check if the user ID on the token matches the order's userId (for cancellation/update by the user)
-    // In a real app, this would be expanded for Admin access
     if (order.userId.toString() !== req.user.id) {
       return res.status(403).json({ error: 'Not authorized to update this order' });
     }
     
     const updatedOrder = await Order.findByIdAndUpdate(
       req.params.id,
-      { status: status },
+      { status: req.body.status },
       { new: true }
     );
     res.json(updatedOrder);
