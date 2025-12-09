@@ -1,26 +1,62 @@
 const mongoose = require('mongoose');
 
+const orderItemSchema = new mongoose.Schema({
+    id: { type: String, required: true },
+    name: { type: String, required: true },
+    price: { type: Number, required: true },
+    breed: { type: String, required: true },
+    quantity: { type: Number, default: 1 }
+}, { _id: false });
+
+const addressSchema = new mongoose.Schema({
+    name: String,
+    phone: String,
+    line1: String,
+    line2: String,
+    city: String,
+    state: String,
+    pincode: String
+}, { _id: false });
+
 const orderSchema = new mongoose.Schema({
-    customer: { type: String, required: true },
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    date: { type: String, required: true }, // Keeping string for simplicity matching frontend
-    items: [{
-        id: String,
-        name: String,
-        price: Number,
-        breed: String
-    }],
-    total: { type: Number, required: true },
-    status: { type: String, default: 'Processing' }, // Processing, Shipped, Delivered
-    address: {
-        name: String,
-        phone: String,
-        line: String,
-        city: String,
-        state: String,
-        pincode: String
+    userId: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'User', 
+        required: true 
     },
-    createdAt: { type: Date, default: Date.now }
+    customer: { 
+        type: String, 
+        required: true 
+    },
+    date: { 
+        type: String, 
+        required: true 
+    },
+    items: [orderItemSchema],
+    total: { 
+        type: Number, 
+        required: true 
+    },
+    status: { 
+        type: String, 
+        default: 'Processing',
+        enum: ['Processing', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled']
+    },
+    address: addressSchema,
+    paymentMethod: { 
+        type: String, 
+        default: 'cod',
+        enum: ['cod', 'upi', 'card', 'netbanking', 'wallet']
+    },
+    paymentStatus: {
+        type: String,
+        default: 'Pending',
+        enum: ['Pending', 'Completed', 'Failed']
+    },
+    createdAt: { 
+        type: Date, 
+        default: Date.now 
+    }
 });
 
 module.exports = mongoose.model('Order', orderSchema);
