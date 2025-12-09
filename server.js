@@ -6,307 +6,391 @@ const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
-// Models
-const Livestock = require('./models/Livestock');
-const Order = require('./models/Order');
-const User = require('./models/User');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret';
+const JWT_SECRET = process.env.JWT_SECRET || 'livestockmart-secret-key-2024';
 
 // Middleware
-app.use(
-  cors({
-    origin: true,
-    credentials: true,
-  })
-);
+app.use(cors({
+    origin: 'http://localhost:3000',
+    credentials: true
+}));
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static('public'));
 
-// Database Connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/livestockmart';
+// Simple in-memory user storage for testing (remove this later)
+let users = [];
 
-mongoose
-  .connect(MONGODB_URI, {
+// Database Connection
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/livestockmart';
+
+console.log('🔧 Connecting to MongoDB...');
+mongoose.connect(MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
-  })
-  .then(() => console.log('✅ Connected to MongoDB'))
-  .catch((err) => console.error('❌ MongoDB Connection Error:', err));
+    serverSelectionTimeoutMS: 5000
+})
+.then(() => {
+    console.log('✅ MongoDB Connected Successfully');
+    
+    // Create test user if none exists
+    createTestUser();
+})
+.catch(err => {
+    console.error('❌ MongoDB Connection Failed:', err.message);
+    console.log('⚠️  Using in-memory user storage for testing');
+});
+
+// Simple User Schema (temporary)
+const userSchema = new mongoose.Schema({
+    name: String,
+    email: { type: String, unique: true },
+    password: String,
+    cart: Array,
+    wishlist: Array,
+    addresses: Array,
+    createdAt: { type: Date, default: Date.now }
+});
+
+const User = mongoose.models.User || mongoose.model('User', userSchema);
+
+async function createTestUser() {
+    try {
+        // Check if test user exists
+        const existingUser = await User.findOne({ email: 'test@test.com' });
+        if (!existingUser) {
+            const testUser = new User({
+                name: 'Test User',
+                email: 'test@test.com',
+                password: 'password123', // Plain password for testing
+                cart: [],
+                wishlist: [],
+                addresses: []
+            });
+            await testUser.save();
+            console.log('✅ Test user created: test@test.com / password123');
+        } else {
+            console.log('✅ Test user already exists');
+        }
+    } catch (error) {
+        console.error('Error creating test user:', error);
+    }
+}
 
 // --- AUTH HELPERS ---
-
 function createToken(user) {
-  return jwt.sign(
-    { id: user._id, email: user.email, name: user.name },
-    JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+    return jwt.sign(
+        { id: user._id || user.id, email: user.email, name: user.name },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+    );
 }
 
 function setAuthCookie(res, token) {
-  res.cookie('token', token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
+    res.cookie('token', token, {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: false, // Set to true in production with HTTPS
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
 }
 
 function authMiddleware(req, res, next) {
-  const token = req.cookies && req.cookies.token;
-  if (!token) {
-    return res.status(401).json({ message: 'Not authenticated' });
-  }
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = { id: decoded.id, email: decoded.email, name: decoded.name };
-    next();
-  } catch (err) {
-    return res.status(401).json({ message: 'Invalid or expired token' });
-  }
+    const token = req.cookies?.token;
+    if (!token) {
+        return res.status(401).json({ message: 'Not authenticated' });
+    }
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = { 
+            id: decoded.id, 
+            email: decoded.email, 
+            name: decoded.name 
+        };
+        next();
+    } catch (err) {
+        return res.status(401).json({ message: 'Invalid or expired token' });
+    }
 }
 
 // --- AUTH ROUTES ---
 
+// Health check
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'OK', 
+        message: 'Server is running',
+        timestamp: new Date().toISOString(),
+        mongoStatus: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    });
+});
+
 // Register
 app.post('/api/auth/register', async (req, res) => {
-  try {
-    const { name, email, password } = req.body;
+    try {
+        console.log('📝 Register attempt:', req.body.email);
+        
+        const { name, email, password } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: 'Name, email and password are required' });
+        if (!name || !email || !password) {
+            return res.status(400).json({ message: 'All fields are required' });
+        }
+
+        // Check if user exists
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ message: 'Email already in use' });
+        }
+
+        // Create new user
+        const newUser = new User({
+            name,
+            email,
+            password, // Store plain password for now
+            cart: [],
+            wishlist: [],
+            addresses: []
+        });
+
+        await newUser.save();
+        
+        // Create token and set cookie
+        const token = createToken(newUser);
+        setAuthCookie(res, token);
+
+        console.log('✅ User registered:', email);
+        res.status(201).json({
+            user: { 
+                id: newUser._id, 
+                name: newUser.name, 
+                email: newUser.email 
+            },
+            message: 'Registration successful'
+        });
+    } catch (error) {
+        console.error('❌ Register error:', error);
+        res.status(500).json({ 
+            message: 'Registration failed',
+            error: error.message 
+        });
     }
-
-    const existing = await User.findOne({ email });
-    if (existing) {
-      return res.status(400).json({ message: 'Email already in use' });
-    }
-
-    const user = new User({ name, email, password });
-    await user.save();
-
-    const token = createToken(user);
-    setAuthCookie(res, token);
-
-    res.status(201).json({
-      user: { id: user._id, name: user.name, email: user.email },
-    });
-  } catch (err) {
-    console.error('Register error:', err);
-    res.status(500).json({ message: 'Server error during registration' });
-  }
 });
 
 // Login
 app.post('/api/auth/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
+    try {
+        console.log('🔐 Login attempt:', req.body.email);
+        
+        const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required' });
+        if (!email || !password) {
+            return res.status(400).json({ message: 'Email and password are required' });
+        }
+
+        // Find user
+        const user = await User.findOne({ email });
+        if (!user) {
+            console.log('❌ User not found:', email);
+            return res.status(400).json({ message: 'Invalid email or password' });
+        }
+
+        // Simple password comparison (no bcrypt for now)
+        if (user.password !== password) {
+            console.log('❌ Password mismatch for:', email);
+            return res.status(400).json({ message: 'Invalid email or password' });
+        }
+
+        // Create token and set cookie
+        const token = createToken(user);
+        setAuthCookie(res, token);
+
+        console.log('✅ Login successful:', email);
+        res.json({
+            user: { 
+                id: user._id, 
+                name: user.name, 
+                email: user.email 
+            },
+            message: 'Login successful'
+        });
+    } catch (error) {
+        console.error('❌ Login error:', error);
+        res.status(500).json({ 
+            message: 'Login failed',
+            error: error.message 
+        });
     }
-
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ message: 'Invalid email or password' });
-    }
-
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid email or password' });
-    }
-
-    const token = createToken(user);
-    setAuthCookie(res, token);
-
-    res.json({
-      user: { id: user._id, name: user.name, email: user.email },
-    });
-  } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ message: 'Server error during login' });
-  }
 });
 
-// Get current user (basic info)
+// Get current user
 app.get('/api/auth/me', authMiddleware, (req, res) => {
-  res.json({ user: req.user });
+    res.json({ 
+        user: req.user,
+        message: 'Authenticated'
+    });
 });
 
 // Logout
 app.post('/api/auth/logout', (req, res) => {
-  res.clearCookie('token', {
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-  });
-  res.json({ message: 'Logged out' });
-});
-
-// --- USER STATE (cart, wishlist, addresses) ---
-
-// Get saved state
-app.get('/api/user/state', authMiddleware, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id).select('cart wishlist addresses');
-    if (!user) return res.status(404).json({ message: 'User not found' });
-
-    // Convert cart items to include livestock details
-    const populatedCart = await Promise.all(
-      (user.cart || []).map(async (item) => {
-        const livestock = await Livestock.findById(item.livestockId);
-        if (!livestock) return null;
-        
-        return {
-          ...livestock.toObject(),
-          selected: item.selected,
-          quantity: item.quantity
-        };
-      })
-    );
-
-    // Filter out null items
-    const validCart = populatedCart.filter(item => item !== null);
-
-    res.json({
-      cart: validCart,
-      wishlist: user.wishlist || [],
-      addresses: user.addresses || [],
+    res.clearCookie('token', {
+        sameSite: 'lax',
+        secure: false
     });
-  } catch (err) {
-    console.error('Get user state error:', err);
-    res.status(500).json({ message: 'Failed to load user state' });
-  }
+    res.json({ message: 'Logged out successfully' });
 });
 
-// Save state
+// --- USER STATE ROUTES ---
+app.get('/api/user/state', authMiddleware, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.json({
+            cart: user.cart || [],
+            wishlist: user.wishlist || [],
+            addresses: user.addresses || []
+        });
+    } catch (error) {
+        console.error('Get user state error:', error);
+        res.status(500).json({ message: 'Failed to load user state' });
+    }
+});
+
 app.put('/api/user/state', authMiddleware, async (req, res) => {
-  try {
-    const { cart = [], wishlist = [], addresses = [] } = req.body;
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    try {
+        const { cart = [], wishlist = [], addresses = [] } = req.body;
+        const user = await User.findById(req.user.id);
+        
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
 
-    // Convert cart items back to the format expected by the schema
-    const cartItems = cart.map(item => ({
-      livestockId: item._id,
-      quantity: item.quantity || 1,
-      selected: item.selected !== false
-    }));
-
-    user.cart = cartItems;
-    user.wishlist = wishlist;
-    user.addresses = addresses;
-    await user.save();
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Save user state error:', err);
-    res.status(500).json({ message: 'Failed to save user state' });
-  }
+        user.cart = cart;
+        user.wishlist = wishlist;
+        user.addresses = addresses;
+        
+        await user.save();
+        
+        res.json({ success: true, message: 'State saved successfully' });
+    } catch (error) {
+        console.error('Save user state error:', error);
+        res.status(500).json({ message: 'Failed to save user state' });
+    }
 });
 
-// --- EXISTING API ROUTES (unchanged URLs) ---
+// --- LIVESTOCK ROUTES ---
+// Simple livestock data for testing
+const livestockData = [
+    {
+        _id: '1',
+        name: 'Alpine Goat',
+        type: 'Goat',
+        breed: 'Alpine',
+        age: '2 years',
+        price: 15000,
+        image: '🐐',
+        tags: ['Healthy', 'Vaccinated'],
+        status: 'Available'
+    },
+    {
+        _id: '2',
+        name: 'Merino Sheep',
+        type: 'Sheep',
+        breed: 'Merino',
+        age: '3 years',
+        price: 20000,
+        image: '🐑',
+        tags: ['Wool Producer', 'Healthy'],
+        status: 'Available'
+    },
+    {
+        _id: '3',
+        name: 'Saanen Goat',
+        type: 'Goat',
+        breed: 'Saanen',
+        age: '1.5 years',
+        price: 18000,
+        image: '🐐',
+        tags: ['Milk Producer', 'Vaccinated'],
+        status: 'Available'
+    }
+];
 
-// 1. Get All Livestock
-app.get('/api/livestock', async (req, res) => {
-  try {
-    const livestock = await Livestock.find().sort({ createdAt: -1 });
-    res.json(livestock);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+// Get all livestock
+app.get('/api/livestock', (req, res) => {
+    res.json(livestockData);
 });
 
-// 2. Add Livestock
-app.post('/api/livestock', async (req, res) => {
-  try {
-    const newItem = new Livestock(req.body);
-    await newItem.save();
-    res.status(201).json(newItem);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-// 3. Delete Livestock
-app.delete('/api/livestock/:id', async (req, res) => {
-  try {
-    await Livestock.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Item deleted' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 4. Get Orders (user-specific)
-app.get('/api/orders', authMiddleware, async (req, res) => {
-  try {
-    // Only return orders for the current user
-    const orders = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 });
-    res.json(orders);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 5. Create Order
-app.post('/api/orders', authMiddleware, async (req, res) => {
-  try {
-    // Add the current user to the order
-    const orderData = {
-      ...req.body,
-      customer: req.user.name,
-      userId: req.user.id
+// Create livestock (admin only - for testing)
+app.post('/api/livestock', (req, res) => {
+    const newItem = {
+        _id: Date.now().toString(),
+        ...req.body,
+        createdAt: new Date()
     };
-    
-    const newOrder = new Order(orderData);
-    await newOrder.save();
+    livestockData.push(newItem);
+    res.status(201).json(newItem);
+});
+
+// --- ORDERS ROUTES ---
+let orders = [];
+
+// Get user orders
+app.get('/api/orders', authMiddleware, (req, res) => {
+    const userOrders = orders.filter(order => order.userId === req.user.id);
+    res.json(userOrders);
+});
+
+// Create order
+app.post('/api/orders', authMiddleware, (req, res) => {
+    const newOrder = {
+        _id: Date.now().toString(),
+        ...req.body,
+        userId: req.user.id,
+        customer: req.user.name,
+        createdAt: new Date(),
+        status: 'Processing'
+    };
+    orders.push(newOrder);
     res.status(201).json(newOrder);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
 });
 
-// 6. Update Order Status
-app.put('/api/orders/:id', authMiddleware, async (req, res) => {
-  try {
-    // Only allow the user who created the order to update it
-    const order = await Order.findById(req.params.id);
-    if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
+// Update order status
+app.put('/api/orders/:id', authMiddleware, (req, res) => {
+    const orderIndex = orders.findIndex(o => o._id === req.params.id);
+    if (orderIndex === -1) {
+        return res.status(404).json({ error: 'Order not found' });
     }
     
-    if (order.userId.toString() !== req.user.id) {
-      return res.status(403).json({ error: 'Not authorized to update this order' });
+    if (orders[orderIndex].userId !== req.user.id) {
+        return res.status(403).json({ error: 'Not authorized' });
     }
     
-    const updatedOrder = await Order.findByIdAndUpdate(
-      req.params.id,
-      { status: req.body.status },
-      { new: true }
-    );
-    res.json(updatedOrder);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    orders[orderIndex].status = req.body.status;
+    res.json(orders[orderIndex]);
 });
 
-// Serve Admin Portal
+// --- SERVE STATIC FILES ---
 app.get('/admin', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-// Serve User Portal
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'user.html'));
+    res.sendFile(path.join(__dirname, 'public', 'user.html'));
+});
+
+// 404 handler for API routes
+app.use('/api/*', (req, res) => {
+    res.status(404).json({ error: 'API endpoint not found' });
 });
 
 // Start Server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+    console.log(`🔐 Test login: test@test.com / password123`);
+    console.log(`📁 Public files served from: ${path.join(__dirname, 'public')}`);
 });
-
-module.exports = app;
