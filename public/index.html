@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LiveStockShop - User App</title>
+    <title>LivestockMart - User App</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -44,6 +44,42 @@
   .lm-pop { transform: scale(.98); opacity: 0; transition: transform 260ms cubic-bezier(.2,.9,.2,1), opacity 260ms; }
   .lm-pop.lm-show { transform: scale(1); opacity: 1; }
 </style>
+
+<!-- PREMIUM ANIMATIONS - START -->
+<style>
+/* Page transition */
+.page-enter { opacity: 0; transform: translateY(20px); }
+.page-enter-active { opacity: 1; transform: translateY(0); transition: all .6s cubic-bezier(.16,.67,.43,1); }
+
+/* Card hover premium */
+.card-premium { transition: transform .35s cubic-bezier(.2,.9,.2,1), box-shadow .35s; }
+.card-premium:hover { transform: translateY(-6px) scale(1.03); box-shadow: 0 18px 40px rgba(0,0,0,0.15); }
+
+/* Scroll reveal */
+.reveal { opacity: 0; transform: translateY(25px); transition: all .7s cubic-bezier(.2,.9,.2,1); }
+.reveal-visible { opacity: 1; transform: translateY(0); }
+
+/* Toast slide/fade */
+.toast-anim { transform: translateX(20px); opacity: 0; animation: toastIn .4s forwards, toastOut .4s forwards 3s; }
+@keyframes toastIn { to { transform: translateX(0); opacity: 1; } }
+@keyframes toastOut { to { transform: translateX(30px); opacity: 0; } }
+
+/* Button press & glow */
+.btn-press { transition: transform .15s ease, box-shadow .3s ease; }
+.btn-press:active { transform: scale(.96); }
+.btn-glow:hover { box-shadow: 0 0 12px rgba(16,185,129,0.6); }
+
+/* Shimmer skeleton */
+.skeleton { background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+@keyframes shimmer { 100% { background-position: -200% 0; } }
+
+/* small utility */
+.lm-fadein { opacity: 0; transform: translateY(12px); transition: opacity .4s, transform .4s; }
+.lm-fadein.lm-show { opacity: 1; transform: translateY(0); }
+
+</style>
+<!-- PREMIUM ANIMATIONS - END -->
+
 </head>
 <body class="h-screen bg-gray-900 text-gray-100">
     <!-- Toast / popup messages -->
@@ -122,7 +158,7 @@
                 </div>
                 <div class="flex items-center gap-3 text-xs text-emerald-100/70 mt-8">
                     <i data-lucide="shield-check" class="w-4 h-4"></i>
-                    <span>Secure authentication • Data stored safely</span>
+                    <span>Secure authentication • Data stored safely in MongoDB</span>
                 </div>
             </div>
             <!-- Right: auth card -->
@@ -135,7 +171,7 @@
                         </div>
                         <div>
                             <h2 class="text-xl font-semibold">Welcome back</h2>
-                            <p class="text-xs text-gray-300">Sign in to access your Livestockshop dashboard</p>
+                            <p class="text-xs text-gray-300">Sign in to access your LivestockMart dashboard</p>
                         </div>
                     </div>
                     <form id="login-form" class="space-y-4 mt-4">
@@ -221,7 +257,7 @@
         <aside class="w-64 bg-white border-r border-gray-200 flex flex-col z-10 hidden md:flex">
             <div class="p-6 flex items-center gap-3">
                 <div class="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-bold">L</div>
-                <span class="text-xl font-bold text-gray-800">Livestockshop</span>
+                <span class="text-xl font-bold text-gray-800">LivestockMart</span>
             </div>
             <nav class="flex-1 px-4 space-y-2 overflow-y-auto">
                 <button onclick="router('browse')" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
@@ -1306,5 +1342,143 @@ async function cancelOrder(id) {
 }
 </script>
 <!-- ✅ REMOVED: broken second script block for payment UI -->
+
+<!-- PREMIUM ANIMATIONS SCRIPTS - START -->
+<script>
+(function(){
+  // animatePage: adds page-enter classes then activates
+  window.animatePage = function(viewId){
+    try {
+      const view = document.getElementById(viewId);
+      if(!view) return;
+      view.classList.add("page-enter");
+      // Force reflow then add active
+      requestAnimationFrame(()=> {
+        view.classList.add("page-enter-active");
+        // remove classes after animation to keep DOM clean
+        setTimeout(()=> {
+          view.classList.remove("page-enter", "page-enter-active");
+        }, 800);
+      });
+    } catch(e){ console.error("animatePage error", e); }
+  };
+
+  // Reveal observer for cards
+  const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add("reveal-visible");
+        revealObserver.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.18 });
+
+  window.applyRevealAndPremium = function(){
+    try {
+      const grid = document.getElementById('livestock-grid');
+      if(!grid) return;
+      // target direct children (cards) and add classes
+      Array.from(grid.children).forEach(el => {
+        el.classList.add('reveal','card-premium');
+        // ensure hidden -> will reveal when intersecting
+        revealObserver.observe(el);
+      });
+    } catch(e){ console.error("applyReveal error", e); }
+  };
+
+  // Patch router to trigger page animation and apply reveal on browse
+  if (window.router) {
+    const __old_router = window.router.bind(window);
+    window.router = function(viewName){
+      try {
+        __old_router(viewName);
+      } catch(e){
+        console.error("router wrapper old failed", e);
+      }
+      // animate the active view
+      try {
+        animatePage('view-' + viewName);
+      } catch(e){ /* ignore */ }
+      // if browse view, apply reveal after short delay
+      if (viewName === 'browse') {
+        setTimeout(() => { applyRevealAndPremium(); }, 100);
+      } else {
+        // still apply to any visible grid if exists
+        setTimeout(() => { applyRevealAndPremium(); }, 200);
+      }
+      // add premium classes to buttons once per route
+      setTimeout(() => {
+        document.querySelectorAll('button:not(.btn-press)').forEach(b => b.classList.add('btn-press'));
+        document.querySelectorAll('.bg-green-600, .bg-gray-900').forEach(b => b.classList.add('btn-glow'));
+      }, 150);
+    };
+  } else {
+    // If router isn't defined yet, wait and retry patch
+    const waitRouter = setInterval(() => {
+      if (window.router) {
+        clearInterval(waitRouter);
+        const __old_router = window.router.bind(window);
+        window.router = function(viewName){
+          try { __old_router(viewName); } catch(e){}
+          try { animatePage('view-' + viewName); } catch(e){}
+          if (viewName === 'browse') setTimeout(() => { applyRevealAndPremium(); }, 100);
+          else setTimeout(() => { applyRevealAndPremium(); }, 200);
+          setTimeout(() => {
+            document.querySelectorAll('button:not(.btn-press)').forEach(b => b.classList.add('btn-press'));
+            document.querySelectorAll('.bg-green-600, .bg-gray-900').forEach(b => b.classList.add('btn-glow'));
+          }, 150);
+        };
+      }
+    }, 150);
+  }
+
+  // Patch showToast to add toast-anim class to new toasts
+  if (window.showToast) {
+    const _oldToast = window.showToast.bind(window);
+    window.showToast = function(message, type){
+      _oldToast(message, type);
+      // find last toast and add class
+      setTimeout(() => {
+        try {
+          const container = document.getElementById('toast-container');
+          if (!container) return;
+          const last = container.lastElementChild;
+          if (last) last.classList.add('toast-anim');
+        } catch(e){ console.error("toast patch error", e); }
+      }, 10);
+    };
+  } else {
+    // If not yet defined, try later
+    const waitToast = setInterval(() => {
+      if (window.showToast) {
+        clearInterval(waitToast);
+        const _oldToast = window.showToast.bind(window);
+        window.showToast = function(message, type){
+          _oldToast(message, type);
+          setTimeout(() => {
+            try {
+              const container = document.getElementById('toast-container');
+              if (!container) return;
+              const last = container.lastElementChild;
+              if (last) last.classList.add('toast-anim');
+            } catch(e){}
+          }, 10);
+        };
+      }
+    }, 120);
+  }
+
+  // On initial load, add premium button classes to existing buttons
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('button:not(.btn-press)').forEach(b => b.classList.add('btn-press'));
+    document.querySelectorAll('.bg-green-600, .bg-gray-900').forEach(b => b.classList.add('btn-glow'));
+    // apply reveal if browse view is present
+    setTimeout(() => { applyRevealAndPremium(); }, 300);
+  });
+
+})();
+</script>
+<!-- PREMIUM ANIMATIONS SCRIPTS - END -->
+
 </body>
 </html>
