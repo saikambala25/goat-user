@@ -154,12 +154,10 @@ app.get('/api/user/state', authMiddleware, async (req, res) => {
     const user = await User.findById(req.user.id).select('cart wishlist addresses');
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Convert cart items to include livestock details
     const populatedCart = await Promise.all(
       (user.cart || []).map(async (item) => {
         const livestock = await Livestock.findById(item.livestockId);
         if (!livestock) return null;
-        
         return {
           ...livestock.toObject(),
           selected: item.selected,
@@ -168,7 +166,6 @@ app.get('/api/user/state', authMiddleware, async (req, res) => {
       })
     );
 
-    // Filter out null items
     const validCart = populatedCart.filter(item => item !== null);
 
     res.json({
@@ -189,7 +186,6 @@ app.put('/api/user/state', authMiddleware, async (req, res) => {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Convert cart items back to the format expected by the schema
     const cartItems = cart.map(item => ({
       livestockId: item._id,
       quantity: item.quantity || 1,
@@ -208,9 +204,8 @@ app.put('/api/user/state', authMiddleware, async (req, res) => {
   }
 });
 
-// --- EXISTING API ROUTES (unchanged URLs) ---
+// --- EXISTING API ROUTES ---
 
-// 1. Get All Livestock
 app.get('/api/livestock', async (req, res) => {
   try {
     const livestock = await Livestock.find().sort({ createdAt: -1 });
@@ -220,7 +215,6 @@ app.get('/api/livestock', async (req, res) => {
   }
 });
 
-// 2. Add Livestock
 app.post('/api/livestock', async (req, res) => {
   try {
     const newItem = new Livestock(req.body);
@@ -231,7 +225,6 @@ app.post('/api/livestock', async (req, res) => {
   }
 });
 
-// 3. Delete Livestock
 app.delete('/api/livestock/:id', async (req, res) => {
   try {
     await Livestock.findByIdAndDelete(req.params.id);
@@ -241,10 +234,8 @@ app.delete('/api/livestock/:id', async (req, res) => {
   }
 });
 
-// 4. Get Orders (user-specific)
 app.get('/api/orders', authMiddleware, async (req, res) => {
   try {
-    // Only return orders for the current user
     const orders = await Order.find({ customer: req.user.name }).sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
@@ -252,16 +243,13 @@ app.get('/api/orders', authMiddleware, async (req, res) => {
   }
 });
 
-// 5. Create Order
 app.post('/api/orders', authMiddleware, async (req, res) => {
   try {
-    // Add the current user to the order
     const orderData = {
       ...req.body,
       customer: req.user.name,
       userId: req.user.id
     };
-    
     const newOrder = new Order(orderData);
     await newOrder.save();
     res.status(201).json(newOrder);
@@ -270,19 +258,12 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
   }
 });
 
-// 6. Update Order Status
 app.put('/api/orders/:id', authMiddleware, async (req, res) => {
   try {
-    // Only allow the user who created the order to update it
     const order = await Order.findById(req.params.id);
-    if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
-    }
-    
-    if (order.userId !== req.user.id) {
-      return res.status(403).json({ error: 'Not authorized to update this order' });
-    }
-    
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (order.userId !== req.user.id) return res.status(403).json({ error: 'Not authorized' });
+
     const updatedOrder = await Order.findByIdAndUpdate(
       req.params.id,
       { status: req.body.status },
@@ -294,43 +275,30 @@ app.put('/api/orders/:id', authMiddleware, async (req, res) => {
   }
 });
 
-
-// --- SIMPLE UPI PAYMENT GATEWAY (Custom) ---
-// Create payment session returning a UPI intent string and paymentId
-
-
-// --- UPI PAYMENT CREATE HANDLER (added by assistant) ---
+// --- UPI PAYMENT CREATE HANDLER ---
 app.post('/api/payment/create', authMiddleware, async (req, res) => {
   try {
     const { amount } = req.body || {};
     if (!amount) return res.status(400).json({ message: "Amount required" });
 
     const paymentId = "PAY_" + Date.now();
-
     const RECEIVER_UPI = process.env.RECEIVER_UPI || 'sai.kambala@ybl';
     const RECEIVER_NAME = encodeURIComponent(process.env.RECEIVER_NAME || 'LivestockMart');
-
     const upiString = `upi://pay?pa=${encodeURIComponent(RECEIVER_UPI)}&pn=${RECEIVER_NAME}&am=${amount}&tn=Livestock+Order`;
 
-    // path where frontend will look for a local QR image
-    const qrPath = '/assets/upi-qr.png';
-
-    return res.json({ paymentId, upiString, qrPath });
+    // ✅ Removed qrPath — no static QR needed
+    return res.json({ paymentId, upiString });
   } catch (err) {
     console.error('Create payment error:', err);
     return res.status(500).json({ message: 'Failed to create payment' });
   }
 });
-// --- end handler ---
 
-
-// Confirm payment (simple endpoint — for production use PSP/webhook verification)
+// Confirm payment
 app.post('/api/payment/confirm', authMiddleware, async (req, res) => {
   try {
     const { paymentId } = req.body;
     if (!paymentId) return res.status(400).json({ message: "Payment ID missing" });
-
-    // For now we simulate verification success. Replace with real verification if available.
     return res.json({ success: true });
   } catch (err) {
     console.error('Confirm payment error:', err);
@@ -338,30 +306,22 @@ app.post('/api/payment/confirm', authMiddleware, async (req, res) => {
   }
 });
 
-// Cancel order endpoint (only allowed for Processing orders)
+// Cancel order
 app.put('/api/orders/:id/cancel', authMiddleware, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
-
-    if (String(order.userId) !== req.user.id) {
-      return res.status(403).json({ message: "Unauthorized" });
-    }
-
-    if (order.status !== "Processing") {
-      return res.status(400).json({ message: "Only processing orders can be cancelled" });
-    }
+    if (String(order.userId) !== req.user.id) return res.status(403).json({ message: "Unauthorized" });
+    if (order.status !== "Processing") return res.status(400).json({ message: "Only processing orders can be cancelled" });
 
     order.status = "Cancelled";
     await order.save();
-
     res.json(order);
   } catch (err) {
     console.error('Cancel order error:', err);
     res.status(500).json({ message: 'Cancel failed' });
   }
 });
-
 
 // Serve Admin Portal
 app.get('/admin', (req, res) => {
