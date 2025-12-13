@@ -16,8 +16,26 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret';
 
 // Middleware
-app.use(cors({ origin: ['https://goat-user.vercel.app','https://goat-index.vercel.app'], credentials: true }));
+
 app.use(express.json());
+
+const allowedOrigins = [
+  'https://goat-user.vercel.app',
+  'https://goat-index.vercel.app',
+  'https://saiad.netlify.app'
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true
+}));
+
+app.options('*', cors());
+
 app.use(cookieParser());
 app.use(express.static('public'));
 
@@ -334,13 +352,3 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
-
-// ADMIN: fetch all orders (crash-proof)
-app.get('/api/admin/orders', async (req, res) => {
-  try {
-    const orders = await Order.find().sort({ createdAt: -1 });
-    res.json(orders);
-  } catch (err) {
-    res.status(500).json([]);
-  }
-});
