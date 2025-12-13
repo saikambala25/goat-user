@@ -864,7 +864,7 @@
                 return `
                 <div class="bg-white p-4 rounded-xl border border-gray-200 hover:shadow-lg transition-shadow">
                     <div class="h-40 bg-gray-100 rounded-lg flex items-center justify-center text-6xl mb-4 relative">
-                        <img src="${API_URL}/livestock/image/${item._id}" alt="${item.name}" class="w-full h-full object-cover rounded-lg" onerror="this.src='https://via.placeholder.com/160'; this.onerror=null;">
+                        ${item.image}
                         <button onclick="toggleWishlist('${item._id}')" class="absolute top-2 right-2 p-2 bg-white rounded-full shadow-sm hover:text-red-500 ${inWishlist ? 'text-red-500' : 'text-gray-400'}">
                             <i data-lucide="heart" class="w-4 h-4 ${inWishlist ? 'fill-current' : ''}"></i>
                         </button>
@@ -906,9 +906,7 @@
                 <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                     <div class="flex items-center gap-4">
                         <input type="checkbox" class="w-4 h-4 mt-1" ${isSelected ? 'checked' : ''} onchange="toggleCartSelection(${index}, this.checked)">
-                        <div class="w-16 h-16 bg-white rounded-lg flex items-center justify-center text-3xl border border-gray-200">
-                            <img src="${API_URL}/livestock/image/${item._id}" alt="${item.name}" class="w-full h-full object-cover rounded-lg" onerror="this.src='https://via.placeholder.com/64'; this.onerror=null;">
-                        </div>
+                        <div class="w-16 h-16 bg-white rounded-lg flex items-center justify-center text-3xl border border-gray-200">${item.image}</div>
                         <div>
                             <h4 class="font-bold text-gray-800">${item.name}</h4>
                             <p class="text-sm text-gray-500">Breed: ${item.breed}</p>
@@ -974,7 +972,7 @@ function renderOrders() {
                         <i data-lucide="x" class="w-4 h-4"></i>
                     </button>
                     <div class="h-40 bg-gray-100 rounded-lg flex items-center justify-center text-6xl mb-4">
-                        <img src="${API_URL}/livestock/image/${item._id}" alt="${item.name}" class="w-full h-full object-cover rounded-lg" onerror="this.src='https://via.placeholder.com/160'; this.onerror=null;">
+                        ${item.image}
                     </div>
                     <h3 class="font-bold text-lg text-gray-800">${item.name}</h3>
                     <div class="flex items-center justify-between mt-4">
@@ -1215,4 +1213,272 @@ async function createOrder(itemsToBuy) {
         }
         // --- INIT APP ---
         function initApp() {
-            if (appInitialized) return
+            if (appInitialized) return;
+            appInitialized = true;
+            updateCartBadge();
+            const dateOptions = { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' };
+            const dateEl = document.getElementById('current-date');
+            if (dateEl) {
+                dateEl.innerText = new Date().toLocaleDateString('en-IN', dateOptions);
+            }
+            router('dashboard');
+        }
+        function attachEventListeners() {
+            const loginForm = document.getElementById('login-form');
+            const registerForm = document.getElementById('register-form');
+            if (loginForm) loginForm.addEventListener('submit', handleLogin);
+            if (registerForm) registerForm.addEventListener('submit', handleRegister);
+            document.addEventListener('click', (e) => {
+                const menu = document.getElementById('profile-menu');
+                const btn = document.getElementById('profile-button');
+                if (!menu || !btn) return;
+                if (!menu.contains(e.target) && !btn.contains(e.target)) {
+                    menu.classList.add('hidden');
+                }
+            });
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            attachEventListeners();
+            checkAuth();
+            lucide.createIcons();
+        });
+// --- PAYMENT UI / CONFIRM HELPERS ---
+function showPaymentUI(upiString, paymentId, itemsToBuy, total) {
+    // Remove existing if present
+    document.querySelectorAll('.lm-pay-popup').forEach(e => e.remove());
+    const payBox = document.createElement("div");
+    payBox.className = "lm-pay-popup fixed inset-0 flex items-center justify-center bg-black/60 z-50";
+    payBox.innerHTML = `
+        <div class="bg-white w-full max-w-md p-6 rounded-2xl text-gray-800">
+            <h2 class="text-xl font-bold mb-3">Complete Payment</h2>
+            <p class="text-sm text-gray-500 mb-4">Pay using any UPI app below or scan the QR code.</p>
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <a href="${upiString}" onclick="setTimeout(()=>{},0)" class="block rounded-lg p-3 text-center font-semibold border">PhonePe</a>
+                <a href="${upiString}" class="block rounded-lg p-3 text-center font-semibold border">Google Pay</a>
+                <a href="${upiString}" class="block rounded-lg p-3 text-center font-semibold border">Paytm</a>
+                <a href="${upiString}" class="block rounded-lg p-3 text-center font-semibold border">BHIM UPI</a>
+            </div>
+            <div class="mt-2 text-center">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiString)}" class="mx-auto rounded-lg border"/>
+                <p class="text-xs text-gray-500 mt-2">Scan & Pay • Amount: ₹${total}</p>
+            </div>
+            <button id="lm-paid-btn" class="w-full bg-green-600 text-white py-2 mt-6 rounded-lg font-semibold">
+                I Have Paid
+            </button>
+            <button id="lm-cancel-btn" class="w-full text-gray-500 mt-3 text-sm">Cancel</button>
+        </div>
+    `;
+    document.body.appendChild(payBox);
+    document.getElementById('lm-paid-btn').onclick = function() {
+        confirmPayment(paymentId, itemsToBuy, total);
+    };
+    document.getElementById('lm-cancel-btn').onclick = function() {
+        document.querySelectorAll('.lm-pay-popup').forEach(e => e.remove());
+    };
+}
+async function confirmPayment(paymentId, items, total) {
+    try {
+        const res = await fetch(`${API_URL}/payment/confirm`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ paymentId })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            showToast(data.message || 'Payment not verified', 'error');
+            return;
+        }
+        // Create order
+        const ordRes = await fetch(`${API_URL}/orders`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                items: items.map(i => ({ id: i._id, name: i.name, price: i.price, breed: i.breed })),
+                total,
+                date: new Date().toLocaleString(),
+                address: currentAddress,
+                status: "Processing"
+            })
+        });
+        if (!ordRes.ok) {
+            const err = await ordRes.json();
+            showToast(err.message || 'Order creation failed', 'error');
+            return;
+        }
+        // Clear cart and save
+        cart = [];
+        await saveUserState();
+        showToast('Payment Successful! Order Placed.', 'success');
+        // Close popup
+        document.querySelectorAll('.lm-pay-popup').forEach(e => e.remove());
+        // Reload orders
+        await loadData();
+        router('orders');
+    } catch (err) {
+        console.error('confirmPayment error', err);
+        showToast('Payment confirmation failed', 'error');
+    }
+}
+async function cancelOrder(id) {
+    try {
+        const res = await fetch(`${API_URL}/orders/${id}/cancel`, {
+            method: "PUT",
+            credentials: "include"
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            showToast(data.message || 'Cancel failed', 'error');
+            return;
+        }
+        showToast('Order cancelled', 'success');
+        await loadData();
+        router('orders');
+    } catch (err) {
+        console.error('cancelOrder error', err);
+        showToast('Cancel failed', 'error');
+    }
+}
+</script>
+<!-- ✅ REMOVED: broken second script block for payment UI -->
+
+<!-- PREMIUM ANIMATIONS SCRIPTS - START -->
+<script>
+(function(){
+  // animatePage: adds page-enter classes then activates
+  window.animatePage = function(viewId){
+    try {
+      const view = document.getElementById(viewId);
+      if(!view) return;
+      view.classList.add("page-enter");
+      // Force reflow then add active
+      requestAnimationFrame(()=> {
+        view.classList.add("page-enter-active");
+        // remove classes after animation to keep DOM clean
+        setTimeout(()=> {
+          view.classList.remove("page-enter", "page-enter-active");
+        }, 800);
+      });
+    } catch(e){ console.error("animatePage error", e); }
+  };
+
+  // Reveal observer for cards
+  const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add("reveal-visible");
+        revealObserver.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.18 });
+
+  window.applyRevealAndPremium = function(){
+    try {
+      const grid = document.getElementById('livestock-grid');
+      if(!grid) return;
+      // target direct children (cards) and add classes
+      Array.from(grid.children).forEach(el => {
+        el.classList.add('reveal','card-premium');
+        // ensure hidden -> will reveal when intersecting
+        revealObserver.observe(el);
+      });
+    } catch(e){ console.error("applyReveal error", e); }
+  };
+
+  // Patch router to trigger page animation and apply reveal on browse
+  if (window.router) {
+    const __old_router = window.router.bind(window);
+    window.router = function(viewName){
+      try {
+        __old_router(viewName);
+      } catch(e){
+        console.error("router wrapper old failed", e);
+      }
+      // animate the active view
+      try {
+        animatePage('view-' + viewName);
+      } catch(e){ /* ignore */ }
+      // if browse view, apply reveal after short delay
+      if (viewName === 'browse') {
+        setTimeout(() => { applyRevealAndPremium(); }, 100);
+      } else {
+        // still apply to any visible grid if exists
+        setTimeout(() => { applyRevealAndPremium(); }, 200);
+      }
+      // add premium classes to buttons once per route
+      setTimeout(() => {
+        document.querySelectorAll('button:not(.btn-press)').forEach(b => b.classList.add('btn-press'));
+        document.querySelectorAll('.bg-green-600, .bg-gray-900').forEach(b => b.classList.add('btn-glow'));
+      }, 150);
+    };
+  } else {
+    // If router isn't defined yet, wait and retry patch
+    const waitRouter = setInterval(() => {
+      if (window.router) {
+        clearInterval(waitRouter);
+        const __old_router = window.router.bind(window);
+        window.router = function(viewName){
+          try { __old_router(viewName); } catch(e){}
+          try { animatePage('view-' + viewName); } catch(e){}
+          if (viewName === 'browse') setTimeout(() => { applyRevealAndPremium(); }, 100);
+          else setTimeout(() => { applyRevealAndPremium(); }, 200);
+          setTimeout(() => {
+            document.querySelectorAll('button:not(.btn-press)').forEach(b => b.classList.add('btn-press'));
+            document.querySelectorAll('.bg-green-600, .bg-gray-900').forEach(b => b.classList.add('btn-glow'));
+          }, 150);
+        };
+      }
+    }, 150);
+  }
+
+  // Patch showToast to add toast-anim class to new toasts
+  if (window.showToast) {
+    const _oldToast = window.showToast.bind(window);
+    window.showToast = function(message, type){
+      _oldToast(message, type);
+      // find last toast and add class
+      setTimeout(() => {
+        try {
+          const container = document.getElementById('toast-container');
+          if (!container) return;
+          const last = container.lastElementChild;
+          if (last) last.classList.add('toast-anim');
+        } catch(e){ console.error("toast patch error", e); }
+      }, 10);
+    };
+  } else {
+    // If not yet defined, try later
+    const waitToast = setInterval(() => {
+      if (window.showToast) {
+        clearInterval(waitToast);
+        const _oldToast = window.showToast.bind(window);
+        window.showToast = function(message, type){
+          _oldToast(message, type);
+          setTimeout(() => {
+            try {
+              const container = document.getElementById('toast-container');
+              if (!container) return;
+              const last = container.lastElementChild;
+              if (last) last.classList.add('toast-anim');
+            } catch(e){}
+          }, 10);
+        };
+      }
+    }, 120);
+  }
+
+  // On initial load, add premium button classes to existing buttons
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('button:not(.btn-press)').forEach(b => b.classList.add('btn-press'));
+    document.querySelectorAll('.bg-green-600, .bg-gray-900').forEach(b => b.classList.add('btn-glow'));
+    // apply reveal if browse view is present
+    setTimeout(() => { applyRevealAndPremium(); }, 300);
+  });
+
+})();
+</script>
+<!-- PREMIUM ANIMATIONS SCRIPTS - END -->
+
+</body>
+</html>
