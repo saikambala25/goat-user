@@ -12,30 +12,17 @@ const Order = require('./models/Order');
 const User = require('./models/User');
 
 const app = express();
-const http = require('http');
-const { Server } = require('socket.io');
 const PORT = process.env.PORT || 3000;
-const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*', credentials: true } });
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret';
 
 // Middleware
-app.use(
-  cors({
-    origin: true,
-    credentials: true,
-  })
-);
+app.use(cors({ origin: ['https://goat-user.vercel.app','https://goat-index.vercel.app'], credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static('public'));
 
 // Database Connection
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/livestockmart';
-
-io.on('connection', (socket) => {
-  console.log('🟢 Client connected:', socket.id);
-});
 
 mongoose
   .connect(MONGODB_URI, {
@@ -260,7 +247,6 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
     };
     const newOrder = new Order(orderData);
     await newOrder.save();
-    io.emit('orders:update');
     res.status(201).json(newOrder);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -278,7 +264,6 @@ app.put('/api/orders/:id', authMiddleware, async (req, res) => {
       { status: req.body.status },
       { new: true }
     );
-    io.emit('orders:update');
     res.json(updatedOrder);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -344,7 +329,7 @@ app.get('/', (req, res) => {
 });
 
 // Start Server
-server.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
 
