@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
+const multer = require('multer'); // NEW
 require('dotenv').config();
 
 // Models
@@ -14,6 +15,20 @@ const User = require('./models/User');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret';
+
+// Configure Multer for file uploads
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        // Ensure this path exists in your project structure: public/images
+        cb(null, 'public/images');
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        // Save file with a unique name
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+const upload = multer({ storage: storage }); // NEW
 
 // Middleware
 app.use(
@@ -154,16 +169,30 @@ app.get('/api/admin/livestock', async (req, res) => {
     }
 });
 
-// Add New Livestock (Admin CUD)
-app.post('/api/admin/livestock', async (req, res) => {
-    try {
-        const newItem = new Livestock(req.body);
-        await newItem.save();
-        res.status(201).json(newItem);
-    } catch (err) {
-        console.error('Admin Add Livestock error:', err);
-        res.status(500).json({ error: err.message });
-    }
+// Add New Livestock (Admin CUD) - UPDATED TO HANDLE FILE UPLOAD
+app.post('/api/admin/livestock', upload.single('image'), async (req, res) => {
+    try {
+        const { name, type, breed, age, price } = req.body;
+        // The image path will be /images/<filename> if a file was uploaded
+        const imagePath = req.file ? `/images/${req.file.filename}` : '🐑'; // Default to emoji if no file
+
+        const newItem = new Livestock({
+            name,
+            type,
+            breed,
+            age,
+            price: parseFloat(price),
+            image: imagePath, // Save the path or emoji
+            tags: ["New Arrival"],
+            status: "Available"
+        });
+
+        await newItem.save();
+        res.status(201).json(newItem);
+    } catch (err) {
+        console.error('Admin Add Livestock error:', err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // Remove Livestock (Admin CUD - New)
