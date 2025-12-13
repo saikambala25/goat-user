@@ -4,7 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
-const multer = require('multer'); // NEW
+const multer = require('multer');
 require('dotenv').config();
 
 // Models
@@ -28,15 +28,31 @@ const storage = multer.diskStorage({
         cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
     }
 });
-const upload = multer({ storage: storage }); // NEW
+const upload = multer({ storage: storage });
 
 // Middleware
+// FIX: Update CORS policy to explicitly allow the frontend domain(s)
+const allowedOrigins = [
+    'https://goat-user.vercel.app', 
+    'https://goat-index.vercel.app', // YOUR FRONTEND DOMAIN ADDED HERE
+    'http://localhost:3000' 
+];
+
 app.use(
   cors({
-    origin: true,
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            return callback(new Error(msg), false);
+        }
+        return callback(null, true);
+    },
     credentials: true,
   })
 );
+
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static('public'));
