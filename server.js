@@ -334,3 +334,13 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
+
+// ADMIN: fetch all orders (crash-proof)
+app.get('/api/admin/orders', async (req, res) => {
+  try {
+    const orders = await Order.find().sort({ createdAt: -1 });
+    res.json(orders);
+  } catch (err) {
+    res.status(500).json([]);
+  }
+});
