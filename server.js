@@ -4,7 +4,6 @@ const cors = require('cors');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
-const multer = require('multer');
 require('dotenv').config();
 
 // Models
@@ -16,43 +15,13 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret';
 
-// Configure Multer for file uploads
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        // Ensure this path exists in your project structure: public/images
-        cb(null, 'public/images');
-    },
-    filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        // Save file with a unique name
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-    }
-});
-const upload = multer({ storage: storage });
-
 // Middleware
-// FIX: Update CORS policy to explicitly allow the frontend domain(s)
-const allowedOrigins = [
-    'https://goat-user.vercel.app', 
-    'https://goat-index.vercel.app', // YOUR FRONTEND DOMAIN ADDED HERE
-    'http://localhost:3000' 
-];
-
 app.use(
   cors({
-    origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) === -1) {
-            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-            return callback(new Error(msg), false);
-        }
-        return callback(null, true);
-    },
+    origin: true,
     credentials: true,
   })
 );
-
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static('public'));
@@ -185,30 +154,16 @@ app.get('/api/admin/livestock', async (req, res) => {
     }
 });
 
-// Add New Livestock (Admin CUD) - UPDATED TO HANDLE FILE UPLOAD
-app.post('/api/admin/livestock', upload.single('image'), async (req, res) => {
-    try {
-        const { name, type, breed, age, price } = req.body;
-        // The image path will be /images/<filename> if a file was uploaded
-        const imagePath = req.file ? `/images/${req.file.filename}` : '🐑'; // Default to emoji if no file
-
-        const newItem = new Livestock({
-            name,
-            type,
-            breed,
-            age,
-            price: parseFloat(price),
-            image: imagePath, // Save the path or emoji
-            tags: ["New Arrival"],
-            status: "Available"
-        });
-
-        await newItem.save();
-        res.status(201).json(newItem);
-    } catch (err) {
-        console.error('Admin Add Livestock error:', err);
-        res.status(500).json({ error: err.message });
-    }
+// Add New Livestock (Admin CUD)
+app.post('/api/admin/livestock', async (req, res) => {
+    try {
+        const newItem = new Livestock(req.body);
+        await newItem.save();
+        res.status(201).json(newItem);
+    } catch (err) {
+        console.error('Admin Add Livestock error:', err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // Remove Livestock (Admin CUD - New)
