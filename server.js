@@ -13,22 +13,12 @@ const User = require('./models/User');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'goat-mart-secure-secret-2025';
+const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret';
 
-// --- DATABASE CONNECTION ---
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://saikambala111_db_user:deDR8YMG99pHBXBc@cluster0.mgzygo3.mongodb.net/livestockmart?retryWrites=true&w=majority';
-
-mongoose.connect(MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => console.log('✅ Connected to MongoDB Atlas'))
-.catch((err) => console.error('❌ MongoDB Connection Error:', err));
-
-// --- MIDDLEWARE ---
+// Middleware
 app.use(
   cors({
-    origin: ['https://goat-index.vercel.app', 'http://localhost:3000'], // Allow local dev + prod
+    origin: true,
     credentials: true,
   })
 );
@@ -36,7 +26,19 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(express.static('public'));
 
+// Database Connection
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/livestockmart';
+
+mongoose
+  .connect(MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log('✅ Connected to MongoDB'))
+  .catch((err) => console.error('❌ MongoDB Connection Error:', err));
+
 // --- AUTH HELPERS ---
+
 function createToken(user) {
   return jwt.sign(
     { id: user._id, email: user.email, name: user.name },
@@ -55,7 +57,7 @@ function setAuthCookie(res, token) {
 }
 
 function authMiddleware(req, res, next) {
-  const token = req.cookies?.token;
+  const token = req.cookies && req.cookies.token;
   if (!token) {
     return res.status(401).json({ message: 'Not authenticated' });
   }
@@ -74,26 +76,24 @@ function authMiddleware(req, res, next) {
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
+
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Name, email and password are required' });
     }
 
-    const existing = await User.findOne({ email });
-    if (existing) {
-      return res.status(400).json({ message: 'Email already in use' });
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({ message: 'User with this email already exists' });
     }
 
-    const user = new User({ name, email, password });
-    await user.save();
+    const newUser = new User({ name, email, password });
+    await newUser.save();
 
-    const token = createToken(user);
+    const token = createToken(newUser);
     setAuthCookie(res, token);
-
-    res.status(201).json({
-      user: { id: user._id, name: user.name, email: user.email },
-    });
+    res.status(201).json({ user: { id: newUser._id, name: newUser.name, email: newUser.email } });
   } catch (err) {
-    console.error('Register error:', err);
+    console.error('Registration error:', err);
     res.status(500).json({ message: 'Server error during registration' });
   }
 });
@@ -118,7 +118,6 @@ app.post('/api/auth/login', async (req, res) => {
 
     const token = createToken(user);
     setAuthCookie(res, token);
-
     res.json({
       user: { id: user._id, name: user.name, email: user.email },
     });
@@ -128,157 +127,134 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Get current user
+// Get current user (basic info)
 app.get('/api/auth/me', authMiddleware, (req, res) => {
   res.json({ user: req.user });
 });
 
 // Logout
 app.post('/api/auth/logout', (req, res) => {
-  res.clearCookie('token', {
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-  });
-  res.json({ message: 'Logged out' });
+  res.clearCookie('token', { sameSite: 'lax', secure: process.env.NODE_ENV === 'production' });
+  res.json({ message: 'Logged out successfully' });
 });
 
-// --- USER STATE (cart, wishlist, addresses) ---
-app.get('/api/user/state', authMiddleware, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id).select('cart wishlist addresses');
-    if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const populatedCart = await Promise.all(
-      (user.cart || []).map(async (item) => {
-        const livestock = await Livestock.findById(item.livestockId);
-        if (!livestock) return null;
-        return {
-          ...livestock.toObject(),
-          selected: item.selected,
-          quantity: item.quantity,
-        };
-      })
-    );
+// ----------------------------------------------------------------------
+// --- NEW ADMIN-SPECIFIC API ROUTES (Full Data Access & CUD) [STEP 7] ---
+// ----------------------------------------------------------------------
 
-    const validCart = populatedCart.filter(item => item !== null);
-    res.json({
-      cart: validCart,
-      wishlist: user.wishlist || [],
-      addresses: user.addresses || [],
-    });
-  } catch (err) {
-    console.error('Get user state error:', err);
-    res.status(500).json({ message: 'Failed to load user state' });
-  }
+// Get All Livestock (Admin)
+app.get('/api/admin/livestock', authMiddleware, async (req, res) => {
+    try {
+        const livestock = await Livestock.find({}).sort({ createdAt: -1 });
+        res.json({ livestock });
+    } catch (err) {
+        console.error('Admin Livestock error:', err);
+        res.status(500).json({ message: 'Server error loading livestock' });
+    }
 });
 
-app.put('/api/user/state', authMiddleware, async (req, res) => {
-  try {
-    const { cart = [], wishlist = [], addresses = [] } = req.body;
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-
-    const cartItems = cart.map(item => ({
-      livestockId: item._id,
-      quantity: item.quantity || 1,
-      selected: item.selected !== false,
-    }));
-
-    user.cart = cartItems;
-    user.wishlist = wishlist;
-    user.addresses = addresses;
-    await user.save();
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Save user state error:', err);
-    res.status(500).json({ message: 'Failed to save user state' });
-  }
+// Add New Livestock (Admin CUD) - Previously /api/livestock POST
+app.post('/api/admin/livestock', authMiddleware, async (req, res) => {
+    try {
+        const newItem = new Livestock(req.body);
+        await newItem.save();
+        res.status(201).json(newItem);
+    } catch (err) {
+        console.error('Admin Add Livestock error:', err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
-// --- LIVESTOCK ROUTES ---
+// Get All Orders (Admin)
+app.get('/api/admin/orders', authMiddleware, async (req, res) => {
+    try {
+        const orders = await Order.find({}).sort({ createdAt: -1 });
+        res.json({ orders });
+    } catch (err) {
+        console.error('Admin Orders error:', err);
+        res.status(500).json({ message: 'Server error loading orders' });
+    }
+});
+
+// Update Order Status (Admin CUD) - Previously /api/orders/:id PUT
+app.put('/api/admin/orders/:id', authMiddleware, async (req, res) => {
+    try {
+        const { status } = req.body;
+        const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true });
+        if (!order) return res.status(404).json({ message: "Order not found" });
+        res.json(order);
+    } catch (err) {
+        console.error('Admin Update Order error:', err);
+        res.status(500).json({ message: 'Server error updating order' });
+    }
+});
+
+// Get All Users (Admin/Customers List)
+app.get('/api/admin/users', authMiddleware, async (req, res) => {
+    try {
+        // Only fetch non-sensitive data
+        const users = await User.find({}, 'name email createdAt').sort({ createdAt: -1 });
+        res.json({ users });
+    } catch (err) {
+        console.error('Admin Users error:', err);
+        res.status(500).json({ message: 'Server error loading users' });
+    }
+});
+
+// ----------------------------------------------------------------------
+// --- USER/PUBLIC API ROUTES (Filtered Data & User State) ---
+// ----------------------------------------------------------------------
+
+// Get Available Livestock (User/Public)
 app.get('/api/livestock', async (req, res) => {
   try {
-    const livestock = await Livestock.find().sort({ createdAt: -1 });
+    // User app only sees 'Available' livestock
+    const livestock = await Livestock.find({ status: 'Available' });
     res.json(livestock);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/livestock', authMiddleware, async (req, res) => {
-  try {
-    const newItem = new Livestock(req.body);
-    await newItem.save();
-    res.status(201).json(newItem);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-app.delete('/api/livestock/:id', authMiddleware, async (req, res) => {
-  try {
-    await Livestock.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Item deleted' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// --- ORDERS ROUTES ---
-// Admin sees ALL orders; user sees only theirs (optional)
+// Get User Orders (User-Specific)
 app.get('/api/orders', authMiddleware, async (req, res) => {
   try {
-    // TODO: In future, check if req.user.isAdmin to restrict
-    const orders = await Order.find().sort({ createdAt: -1 }); // All orders
+    // User app only sees their own orders
+    const orders = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// Create Order (User)
 app.post('/api/orders', authMiddleware, async (req, res) => {
   try {
-    const orderData = {
+    const newOrder = new Order({
       ...req.body,
-      customer: req.user.name,
       userId: req.user.id,
-    };
-    const newOrder = new Order(orderData);
+      customer: req.user.name,
+    });
     await newOrder.save();
+    // After successful order creation, clear cart state from user's document
+    await User.findByIdAndUpdate(req.user.id, { $set: { cart: [] } });
     res.status(201).json(newOrder);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error('Create order error:', err);
+    res.status(500).json({ error: err.message || 'Failed to create order' });
   }
 });
 
-app.put('/api/orders/:id', authMiddleware, async (req, res) => {
-  try {
-    const order = await Order.findById(req.params.id);
-    if (!order) return res.status(404).json({ error: 'Order not found' });
-    if (order.userId.toString() !== req.user.id) {
-      return res.status(403).json({ error: 'Not authorized' });
-    }
-
-    const updatedOrder = await Order.findByIdAndUpdate(
-      req.params.id,
-      { status: req.body.status },
-      { new: true }
-    );
-    res.json(updatedOrder);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
+// Cancel order (User)
 app.put('/api/orders/:id/cancel', authMiddleware, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
-    if (!order) return res.status(404).json({ message: 'Order not found' });
-    if (order.userId.toString() !== req.user.id) return res.status(403).json({ message: 'Unauthorized' });
-    if (order.status !== 'Processing') return res.status(400).json({ message: 'Only processing orders can be cancelled' });
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    if (String(order.userId) !== req.user.id) return res.status(403).json({ message: "Unauthorized" });
+    if (order.status !== "Processing") return res.status(400).json({ message: "Only processing orders can be cancelled" });
 
-    order.status = 'Cancelled';
+    order.status = "Cancelled";
     await order.save();
     res.json(order);
   } catch (err) {
@@ -287,45 +263,46 @@ app.put('/api/orders/:id/cancel', authMiddleware, async (req, res) => {
   }
 });
 
-// --- ADMIN-ONLY ROUTES ---
-app.get('/api/admin/users', authMiddleware, async (req, res) => {
+// User State (Cart, Wishlist, Addresses)
+app.get('/api/user/state', authMiddleware, async (req, res) => {
   try {
-    // In production, add: if (!req.user.isAdmin) return res.status(403).json({ message: 'Admin only' });
-    const users = await User.find().select('name email createdAt');
-    res.json(users.map(u => ({
-      id: u._id,
-      name: u.name,
-      email: u.email,
-      joined: new Date(u.createdAt).toLocaleDateString('en-IN'),
-    })));
+    const user = await User.findById(req.user.id, 'cart wishlist addresses');
+    res.json(user);
   } catch (err) {
-    console.error('Admin users fetch error:', err);
-    res.status(500).json({ message: 'Failed to load users' });
+    res.status(500).json({ error: err.message });
   }
 });
 
-// --- UPI PAYMENT HANDLERS ---
-app.post('/api/payment/create', authMiddleware, async (req, res) => {
+app.put('/api/user/state', authMiddleware, async (req, res) => {
   try {
-    const { amount } = req.body || {};
-    if (!amount) return res.status(400).json({ message: 'Amount required' });
+    const { cart, wishlist, addresses } = req.body;
+    await User.findByIdAndUpdate(req.user.id, { $set: { cart, wishlist, addresses } });
+    res.json({ message: 'State updated' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
+// Payment simulation routes (unchanged)
+app.post('/api/payment/create', authMiddleware, async (req, res) => {
+  // Simple simulation of creating a payment session
+  try {
+    const { amount } = req.body;
     const paymentId = 'PAY_' + Date.now();
-    const RECEIVER_UPI = process.env.RECEIVER_UPI || 'sai.kambala@ybl';
-    const RECEIVER_NAME = encodeURIComponent(process.env.RECEIVER_NAME || 'LivestockMart');
-    const upiString = `upi://pay?pa=${encodeURIComponent(RECEIVER_UPI)}&pn=${RECEIVER_NAME}&am=${amount}&tn=Livestock+Order`;
-
-    return res.json({ paymentId, upiString });
+    const upiString = `upi://pay?pa=dummyupi@bank&pn=LivestockMart&mc=0000&tid=${paymentId}&tr=${paymentId}&am=${amount}`;
+    res.json({ upiString, paymentId });
   } catch (err) {
     console.error('Create payment error:', err);
-    return res.status(500).json({ message: 'Failed to create payment' });
+    res.status(500).json({ message: 'Failed to create payment' });
   }
 });
 
 app.post('/api/payment/confirm', authMiddleware, async (req, res) => {
+  // Simple simulation of confirming payment
   try {
     const { paymentId } = req.body;
-    if (!paymentId) return res.status(400).json({ message: 'Payment ID missing' });
+    if (!paymentId) return res.status(400).json({ message: "Payment ID missing" });
+    // In a real app, you would verify the payment with a provider like Razorpay/Stripe here.
     return res.json({ success: true });
   } catch (err) {
     console.error('Confirm payment error:', err);
@@ -333,18 +310,18 @@ app.post('/api/payment/confirm', authMiddleware, async (req, res) => {
   }
 });
 
-// --- STATIC FILE SERVING ---
+
+// Serve Static Files and Start Server
+const PUBLIC_DIR = path.join(__dirname, 'public');
+
 app.get('/admin', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+  res.sendFile(path.join(PUBLIC_DIR, 'admin.html'));
 });
 
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'user.html'));
+  res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
 });
 
-// --- START SERVER ---
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`🌐 Public URL should be: https://goat-index.vercel.app`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
-module.exports = app;
