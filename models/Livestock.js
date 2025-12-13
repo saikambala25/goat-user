@@ -6,7 +6,10 @@ const livestockSchema = new mongoose.Schema({
     breed: { type: String, required: true },
     age: { type: String, required: true },
     price: { type: Number, required: true },
-    image: { type: String, required: true }, // Emoji or URL
+    image: {
+        data: { type: Buffer },
+        contentType: { type: String }
+    }, // Binary image data (optional)
     tags: [String],
     status: { type: String, default: 'Available' },
     createdAt: { type: Date, default: Date.now }
